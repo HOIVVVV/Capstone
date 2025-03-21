@@ -3,8 +3,8 @@ import json
 import shutil
 
 # 기존 데이터 폴더들 (각 폴더마다 annotations.json이 있음)
-dataset_root = "dataset_folder"
-folders = ["folder1", "folder2", "folder3"]  # 여기에 모든 폴더 이름 추가
+dataset_root = "라벨링데이터"
+folders = ["1-1-1", "1-1-2", "1-2", "1-3", "1-4", "1-5", "2-1" , "2-2"]  # 여기에 모든 폴더 이름 추가
 
 # 통합된 JSON 데이터
 merged_data = {"images": [], "annotations": []}
