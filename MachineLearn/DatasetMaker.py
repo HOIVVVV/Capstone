@@ -2,52 +2,61 @@ import os
 import json
 import shutil
 
-# 기존 데이터 폴더들 (각 폴더마다 annotations.json이 있음)
-dataset_root = "라벨링데이터"
-folders = ["1-1-1", "1-1-2", "1-2", "1-3", "1-4", "1-5", "2-1" , "2-2"]  # 여기에 모든 폴더 이름 추가
+# ✅ 경로 설정
+dataset_root = ""  # 데이터셋 최상위 폴더
+label_root = os.path.join(dataset_root, "라벨링데이터")  # JSON들이 있는 폴더
+image_root = os.path.join(dataset_root, "원천데이터")  # 실제 이미지들이 있는 폴더
+output_json_path = os.path.join(dataset_root, "merged_annotations.json")  # 병합된 JSON 저장 경로
 
-# 통합된 JSON 데이터
-merged_data = {"images": [], "annotations": []}
+# ✅ 최종 JSON 데이터 구조
+merged_data = {"images": [], "annotations": [], "categories": []}
 image_id_offset = 0
 annotation_id_offset = 0
 category_set = set()
 
-# 통합할 이미지 저장 경로
-image_output_folder = os.path.join(dataset_root, "image_folder")
-os.makedirs(image_output_folder, exist_ok=True)
+# ✅ 원천데이터의 이미지 파일 목록 가져오기
+image_files = set(os.listdir(image_root))  # 원천데이터 폴더에 존재하는 이미지 파일 목록
 
-# 각 폴더의 JSON 파일을 하나로 합치기
-for folder in folders:
-    json_path = os.path.join(dataset_root, folder, "annotations.json")
+# ✅ 라벨링 데이터(JSON) 파일 리스트 가져오기
+json_files = [f for f in os.listdir(label_root) if f.endswith(".json")]
+
+# ✅ JSON 병합 시작
+for json_file in json_files:
+    json_path = os.path.join(label_root, json_file)
     
     with open(json_path, "r", encoding="utf-8") as f:
         data = json.load(f)
 
-    # 이미지 데이터 처리
+    # 📌 이미지 데이터 처리 (원천데이터에 존재하는 이미지만 추가)
+    valid_images = []
+    image_id_map = {}  # 기존 image_id → 새로운 image_id 매핑
     for img in data["images"]:
-        new_image_id = img["id"] + image_id_offset  # ID 중복 방지
-        img["id"] = new_image_id
-        merged_data["images"].append(img)
-        
-        # 이미지 파일 이동 (하나의 폴더로 모으기)
-        old_img_path = os.path.join(dataset_root, folder, img["file_name"])
-        new_img_path = os.path.join(image_output_folder, img["file_name"])
-        shutil.move(old_img_path, new_img_path)
+        if img["file_name"] in image_files:  # 원천데이터에 해당 이미지가 존재하는 경우만 추가
+            new_image_id = image_id_offset + 1
+            image_id_map[img["id"]] = new_image_id  # 기존 ID → 새로운 ID 매핑
+            img["id"] = new_image_id
+            valid_images.append(img)
+            image_id_offset += 1  # ID 증가
 
-    # 어노테이션 데이터 처리
+    # 📌 어노테이션 데이터 처리 (유효한 이미지 ID만 유지)
+    valid_annotations = []
     for ann in data["annotations"]:
-        ann["id"] += annotation_id_offset  # ID 중복 방지
-        ann["image_id"] += image_id_offset  # 이미지 ID도 맞춰줘야 함
-        merged_data["annotations"].append(ann)
-        category_set.add(ann["category_id"])
+        if ann["image_id"] in image_id_map:  # 원천데이터에 존재하는 이미지의 어노테이션만 유지
+            ann["id"] = annotation_id_offset + 1
+            ann["image_id"] = image_id_map[ann["image_id"]]  # 새로운 image_id 적용
+            valid_annotations.append(ann)
+            annotation_id_offset += 1  # ID 증가
+            category_set.add(ann["category_id"])
 
-    # ID 오프셋 업데이트
-    image_id_offset = max(img["id"] for img in merged_data["images"]) + 1
-    annotation_id_offset = max(ann["id"] for ann in merged_data["annotations"]) + 1
+    # 📌 병합된 데이터에 추가
+    merged_data["images"].extend(valid_images)
+    merged_data["annotations"].extend(valid_annotations)
 
-# 통합된 JSON 저장
-output_json_path = os.path.join(dataset_root, "annotations.json")
+# ✅ 카테고리 데이터 추가 (중복 제거 후 정리)
+merged_data["categories"] = [{"id": cat_id, "name": f"category_{cat_id}"} for cat_id in sorted(category_set)]
+
+# ✅ 병합된 JSON 저장
 with open(output_json_path, "w", encoding="utf-8") as f:
     json.dump(merged_data, f, indent=4, ensure_ascii=False)
 
-print("✅ 모든 JSON이 병합되었고, 이미지가 하나의 폴더로 이동되었습니다.")
+print("✅ JSON 병합 완료! 원천데이터 이미지 기준으로 라벨링되었습니다.")
