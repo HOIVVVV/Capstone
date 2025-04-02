@@ -16,10 +16,13 @@ category_set = set()
 
 # ✅ 원천데이터의 이미지 파일 목록 가져오기 (하위 폴더 포함)
 image_files = set()
+image_paths = {}  # 이미지 이름 → 경로 매핑
 for root, _, files in os.walk(image_root):
     for file in files:
         if file.lower().endswith(('.jpg', '.jpeg', '.png', '.bmp', '.gif')):
-            image_files.add(os.path.join(root, file))
+            full_path = os.path.join(root, file)
+            image_files.add(file)
+            image_paths[file] = full_path  # 경로 저장
 
 # ✅ 라벨링 데이터(JSON) 파일 리스트 가져오기 (하위 폴더 포함)
 json_files = []
@@ -34,7 +37,7 @@ for json_path in json_files:
         data = json.load(f)
 
     # 📌 이미지 파일 이름 목록 생성
-    image_names = {os.path.basename(path) for path in image_files}  # 경로 제거하고 이름만 저장
+    image_names = set(image_files)  # 경로 제거하고 이름만 저장
 
     # 📌 이미지 데이터 처리 (원천데이터에 존재하는 이미지만 추가)
     valid_images = []
@@ -42,6 +45,7 @@ for json_path in json_files:
     for img in data["images"]:
         # 이미지 이름만 비교
         if img["file_name"] in image_names:  # 이미지 이름만 비교
+            img["file_path"] = image_paths[img["file_name"]]  # 경로 추가
             new_image_id = image_id_offset + 1
             image_id_map[img["id"]] = new_image_id  # 기존 ID → 새로운 ID 매핑
             img["id"] = new_image_id
@@ -57,7 +61,6 @@ for json_path in json_files:
             valid_annotations.append(ann)
             annotation_id_offset += 1  # ID 증가
             category_set.add(ann["category_id"])
-            
 
     # 📌 병합된 데이터에 추가
     merged_data["images"].extend(valid_images)
