@@ -31,7 +31,7 @@ class CustomDataset(Dataset):
         ann_info = self.annotations.get(img_info["id"], {})
 
         # 이미지 경로 구성 (원천데이터 폴더 구조 반영)
-        img_path = os.path.join(self.img_root_dir, img_info["folder"], img_info["file_name"])
+        img_path = img_info["file_path"]
         image = Image.open(img_path).convert("RGB")
 
         # 라벨 가져오기
@@ -55,7 +55,7 @@ transform = transforms.Compose([
 ])
 
 # ✅ 3. 데이터셋 및 데이터로더 생성
-dataset = CustomDataset("merged_annotations.json", "원천데이터터", transform=transform)
+dataset = CustomDataset("merged_annotations.json", "원천데이터", transform=transform)
 dataloader = DataLoader(dataset, batch_size=32, shuffle=True)
 
 # ✅ 4. ResNeXt 모델 불러오기 및 수정
