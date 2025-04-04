@@ -60,6 +60,7 @@ dataloader = DataLoader(dataset, batch_size=32, shuffle=True)
 
 # ✅ 4. ResNeXt 모델 불러오기 및 수정
 device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
+print(f"✅ 현재 사용 중인 디바이스: {device}")
 
 model = models.resnext50_32x4d(pretrained=True)  # ResNeXt50-32x4d 사용
 num_classes = 10  # 클래스 개수 (확인 필요)
