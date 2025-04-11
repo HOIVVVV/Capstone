@@ -14,7 +14,7 @@ import numpy as np
 class CustomDataset(Dataset):
     def __init__(self, json_path, transform=None):
         with open(json_path, "r", encoding="utf-8") as f:
-            data = json.load(f) #ㅅㅇㄹㄴㅇㄹ
+            data = json.load(f)
 
         self.transform = transform
         self.images = {img["id"]: img for img in data["images"]}
