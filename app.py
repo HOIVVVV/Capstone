@@ -8,6 +8,7 @@ from base64 import b64encode
 import numpy as np
 import seaborn as sns
 import pandas as pd
+from routes import register_routes
 
 # Use a non-GUI backend for Matplotlib
 import matplotlib
@@ -22,9 +23,8 @@ app = Flask(__name__)
 #MODEL_PATH = 'models/class_shipsEar.pth'
 #model = load_model(MODEL_PATH)
 
-@app.route('/')
-def hello():
-    return "hello"
+app = Flask(__name__)
+register_routes(app)
 
 if __name__ == '__main__':
     app.run(debug=True)
