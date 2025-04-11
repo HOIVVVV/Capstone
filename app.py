@@ -15,12 +15,6 @@ matplotlib.use('Agg')
 
 app = Flask(__name__)
 
-# Path to the folder containing audio files
-FOLDER_PATH = 'static/data/audiofiles'  # The folder containing your audio files
-
-UPLOAD_FOLDER = "uploads"
-os.makedirs(UPLOAD_FOLDER, exist_ok=True)
-
 # Load the model once when the app starts
 #def load_model(model_path):
  #   return model
@@ -28,6 +22,9 @@ os.makedirs(UPLOAD_FOLDER, exist_ok=True)
 #MODEL_PATH = 'models/class_shipsEar.pth'
 #model = load_model(MODEL_PATH)
 
+@app.route('/')
+def hello():
+    return "hello"
 
 if __name__ == '__main__':
     app.run(debug=True)

@@ -1,0 +1,9 @@
+데이터셋 구조
+    라벨링데이터터 : 라벨별로 각 이미지 데이터에 대한 정보가 annotations.json 파일로 존재
+    원천데이터 : 라벨별로 이미지 데이터 존재
+    라벨: 손상(1)/비손상(2)-손상유형(num)-동일 손상 유형, 다른 형태(num)
+        예시 1-1-1
+
+DatasetMake.py 데이터셋 이미지 파일메 맞춰, annotations.json 파일을 수정하는 코드
+mLearn.py resNet50xt 모델로 이미지 학습 코드
+app.py 앱 실행 파일
