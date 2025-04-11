@@ -21,22 +21,31 @@ class CustomDataset(Dataset):
         self.annotations = data["annotations"]
 
         # 클래스 코드 추출 및 라벨 매핑
-        self.class_codes = sorted({ann["attributes"]["Class_code"] for ann in self.annotations})
+        self.class_codes = sorted({
+            ann["attributes"]["Class_code"]
+            for ann in self.annotations
+            if "attributes" in ann and "Class_code" in ann["attributes"]
+        })
         self.class_map = {code: i for i, code in enumerate(self.class_codes)}
 
         self.items = []
         for ann in self.annotations:
             image_info = self.images[ann["image_id"]]
             image_path = image_info["file_path"]
-            label_code = ann["attributes"]["Class_code"]
-            self.items.append((image_path, self.class_map[label_code]))
+            label_code = sorted({
+            ann["attributes"]["Class_code"]
+            for ann in self.annotations
+            if "attributes" in ann and "Class_code" in ann["attributes"]
+        })
+            label_key = label_code[0] if isinstance(label_code, list) else label_code
+            self.items.append((image_path, self.class_map[label_key]))
 
     def __len__(self):
         return len(self.items)
 
     def __getitem__(self, idx):
         img_path, label = self.items[idx]
-        full_path = os.path.join("원천데이터", img_path)
+        full_path = img_path
         image = Image.open(full_path).convert("RGB")
 
         if self.transform:
@@ -46,11 +55,7 @@ class CustomDataset(Dataset):
 
 # ✅ 2. 모델 가중치 로딩 및 transform 정의
 weights = ResNeXt50_32X4D_Weights.DEFAULT
-transform = transforms.Compose([
-    transforms.Resize((224, 224)),
-    transforms.ToTensor(),
-    transforms.Normalize(mean=weights.meta["mean"], std=weights.meta["std"])
-])
+transform = weights.transforms()
 
 # ✅ 3. 데이터셋 및 분할
 dataset = CustomDataset("merged_annotations.json", transform=transform)
