@@ -3,7 +3,7 @@ import json
 import shutil
 
 # ✅ 경로 설정
-dataset_root = ""  # 데이터셋 최상위 폴더
+dataset_root = "학습데이터"  # 데이터셋 최상위 폴더
 label_root = os.path.join(dataset_root, "라벨링데이터")  # JSON들이 있는 폴더
 image_root = os.path.join(dataset_root, "원천데이터")  # 실제 이미지들이 있는 폴더
 output_json_path = os.path.join(dataset_root, "merged_annotations.json")  # 병합된 JSON 저장 경로
