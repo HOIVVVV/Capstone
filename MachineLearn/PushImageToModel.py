@@ -29,16 +29,19 @@ model = resnext50_32x4d(weights=weights)
 
 # 마지막 레이어의 출력 크기 수정 (예: 12개 클래스로 fine-tune)
 num_features = model.fc.in_features
-model.fc = torch.nn.Linear(num_features, 12)  # 12개의 클래스로 수정
+model.fc = torch.nn.Linear(num_features, 2)  # 12개의 클래스로 수정
 
 # 학습된 모델 가중치 불러오기
-checkpoint = torch.load("resnext_model.pth3")
+checkpoint = torch.load("resnext_binary_model.pth")
 model.load_state_dict(checkpoint, strict=False)  # strict=False로 하여 미ismatch된 가중치는 무시
 
 model.eval()  # 평가 모드로 설정
 
 # 클래스 코드 -> 라벨 매핑
-class_map = get_class_map_from_json("학습데이터/merged_annotations.json")
+#class_map = get_class_map_from_json("학습데이터/merged_annotations.json")
+
+# ✅ 클래스 매핑 직접 정의 (이진 분류 전용)
+class_map = {0: "OUT", 1: "IN"}
 
 # 이미지 전처리 (학습과 동일하게 수정)
 def preprocess_image(image_path):
@@ -53,10 +56,11 @@ def preprocess_image(image_path):
     image = Image.open(image_path).convert("RGB")
     return transform(image).unsqueeze(0)
 
+# 이미지 전처리 및 Grad-CAM 적용 함수
 def predict_image(image_path, save_path):
     # 원본 이미지 열기
     original_image = Image.open(image_path).convert("RGB")
-    original_np = np.array(original_image)
+    original_width, original_height = original_image.size
 
     # 전처리
     preprocess = transforms.Compose([
@@ -68,22 +72,36 @@ def predict_image(image_path, save_path):
     ])
     image_tensor = preprocess(original_image).unsqueeze(0)
 
-    # Grad-CAM
+    device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
+    image_tensor = image_tensor.to(device)
+    model.to(device)
+
+    # Grad-CAM 객체 생성 (layer4 or layer3 추천)
     grad_cam = GradCAM(model, target_layer=model.layer4[2].conv3)
 
     with torch.no_grad():
         outputs = model(image_tensor)
         probabilities = torch.nn.functional.softmax(outputs, dim=1)
-        top3_probs, top3_preds = torch.topk(probabilities, 3)
+        top3_probs, top3_preds = torch.topk(probabilities, 1)
 
+    # Grad-CAM 생성
     cam = grad_cam.generate_cam(image_tensor)
+    
+    if cam is None or np.max(cam) == 0:
+        print("❌ CAM 생성 실패 또는 모든 값이 0입니다.")
+        return []
+    else:
+        print("✅ CAM 생성 성공. 최대값:", np.max(cam))
 
     # ✅ CAM을 원본 이미지 크기로 리사이즈
-    cam_resized = cv2.resize(cam, (original_np.shape[1], original_np.shape[0]))
+    cam_resized = cv2.resize(cam, (original_width, original_height))
+
+    # 히트맵 생성 및 오버레이
     heatmap = cv2.applyColorMap(np.uint8(255 * cam_resized), cv2.COLORMAP_JET)
     heatmap = np.float32(heatmap) / 255
+    original_np = np.array(original_image) / 255.0
 
-    overlay = heatmap + np.float32(original_np) / 255
+    overlay = heatmap + original_np
     overlay = overlay / np.max(overlay)
     overlay = np.uint8(255 * overlay)
 
@@ -95,7 +113,7 @@ def predict_image(image_path, save_path):
     # 예측 결과 반환
     top3_results = [
         (class_map[top3_preds[0][i].item()], top3_probs[0][i].item())
-        for i in range(3)
+        for i in range(1)
     ]
     return top3_results
 

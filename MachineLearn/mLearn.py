@@ -26,6 +26,9 @@ class CustomDataset(Dataset):
         self.transform = transform
         self.images = {img["id"]: img for img in data["images"]}
         self.annotations = data["annotations"]
+        
+        # ✅ CustomDataset에서 binary classification용 라벨 생성
+        self.binary_class_map = {"OUT": 0}  # 외부 → 0, 나머지 → 1
 
         self.class_codes = sorted({
             ann["attributes"]["Class_code"]
@@ -44,10 +47,15 @@ class CustomDataset(Dataset):
             if exclude_corrupted_paths and image_path in exclude_corrupted_paths:
                 continue
 
+            #if "attributes" in ann and "Class_code" in ann["attributes"]:
+            #   label_code = ann["attributes"]["Class_code"]
+            #  label_key = self.class_map[label_code]
+            #    self.items.append((image_path, label_key))
+                
             if "attributes" in ann and "Class_code" in ann["attributes"]:
                 label_code = ann["attributes"]["Class_code"]
-                label_key = self.class_map[label_code]
-                self.items.append((image_path, label_key))
+                binary_label = self.binary_class_map.get(label_code, 1)  # OUT이면 0, 그 외는 1
+                self.items.append((image_path, binary_label))
 
     def __len__(self):
         return len(self.items)
@@ -160,7 +168,9 @@ def main():
     with ThreadPoolExecutor(max_workers=8) as executor:
         labels = list(executor.map(load_label, files))
 
-    num_classes = max(labels) + 1
+    #num_classes = max(labels) + 1
+    # ✅ num_classes 고정 (2개 클래스)
+    num_classes = 2
     dataset = PreprocessedDataset(preprocessed_dir, transform=None)
 
     train_size = int(0.9 * len(dataset))
@@ -182,7 +192,7 @@ def main():
     scaler = GradScaler()
     scheduler = lr_scheduler.StepLR(optimizer, step_size=5, gamma=0.1)
 
-    num_epochs = 50
+    num_epochs = 10
     for epoch in range(num_epochs):
         model.train()
         running_loss = 0.0
