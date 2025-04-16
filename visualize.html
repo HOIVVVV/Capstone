@@ -1,0 +1,34 @@
+<!DOCTYPE html>
+<html>
+<head>
+    <title>손상 통계 시각화</title>
+</head>
+<body>
+    <h1>손상 통계 시각화</h1>
+    <form method="POST" action="/generate_chart">
+        <label>조회 데이터 선택:</label>
+        <select name="view_by">
+            <option value="location">촬영 위치</option>
+            <!-- 추후 확장 가능 -->
+        </select><br><br>
+
+        <label>그래프 종류 선택:</label>
+        <select name="chart_type">
+            <option value="bar">Bar 그래프</option>
+            <option value="pie">Pie 차트</option>
+        </select><br><br>
+
+        <label>필터링: 손상 유형</label><br>
+        {% for dtype in damage_types %}
+            <input type="checkbox" name="damage_type" value="{{ dtype }}">{{ dtype }}<br>
+        {% endfor %}
+
+        <label>촬영 위치</label><br>
+        {% for loc in locations %}
+            <input type="checkbox" name="location" value="{{ loc }}">{{ loc }}<br>
+        {% endfor %}
+
+        <br><input type="submit" value="그래프 생성">
+    </form>
+</body>
+</html>
