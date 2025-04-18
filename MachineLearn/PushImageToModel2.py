@@ -32,7 +32,8 @@ num_features = model.fc.in_features
 model.fc = torch.nn.Linear(num_features, 12)  # 12개의 클래스로 수정
 
 # 학습된 모델 가중치 불러오기
-checkpoint = torch.load("resnext_model.pth3")
+#checkpoint = torch.load("resnext_model.pth3")
+checkpoint = torch.load("resnext_model.pth3", map_location=torch.device('cpu'))
 model.load_state_dict(checkpoint, strict=False)  # strict=False로 하여 미ismatch된 가중치는 무시
 
 model.eval()  # 평가 모드로 설정
