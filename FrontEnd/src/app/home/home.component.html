@@ -1,0 +1,102 @@
+<div class="main-content">
+    <div class="container-fluid">
+        <div class="row">
+            <div class="col-md-4">
+                <lbd-chart
+                  [title]="'손상 유형 통계'"
+                  [subtitle]="'하수관로 손상 유형별 분포'"
+                  [chartClass]="'ct-perfect-fourth'"
+                  [chartType]="damageTypeChartType"
+                  [chartData]="damageTypeChartData"
+                  [legendItems]="damageTypeChartLegendItems"
+                  [withHr]="true"
+                  [footerIconClass]="'fa fa-clock-o'"
+                  [footerText]="'데이터 갱신: 2일 전'">
+                </lbd-chart>
+            </div>
+            <div class="col-md-8">
+                <lbd-chart
+                  [title]="'구간별 손상률'"
+                  [subtitle]="'최근 검사 결과'"
+                  [chartType]="sectionDamageChartType"
+                  [chartData]="sectionDamageChartData"
+                  [chartOptions]="sectionDamageChartOptions"
+                  [chartResponsive]="sectionDamageChartResponsive"
+                  [legendItems]="sectionDamageChartLegendItems"
+                  [withHr]="true"
+                  [footerIconClass]="'fa fa-history'"
+                  [footerText]="'3분 전 업데이트'">
+                </lbd-chart>
+            </div>
+        </div>
+        
+        <div class="row">
+            <div class="col-md-6">
+                <lbd-chart
+                  [title]="'손상 발생 빈도'"
+                  [subtitle]="'월별 통계'"
+                  [chartType]="monthlyDamageChartType"
+                  [chartData]="monthlyDamageChartData"
+                  [chartOptions]="monthlyDamageChartOptions"
+                  [chartResponsive]="monthlyDamageChartResponsive"
+                  [legendItems]="monthlyDamageChartLegendItems"
+                  [withHr]="true"
+                  [footerIconClass]="'fa fa-check'"
+                  [footerText]="'데이터 검증 완료'">
+                </lbd-chart>
+            </div>
+
+            <div class="col-md-6">
+                <div class="card">
+                    <div class="header">
+                        <h4 class="title">검사 결과 요약</h4>
+                        <p class="category">최근 하수관로 검사 기록</p>
+                    </div>
+                    <div class="content">
+                        <div class="table-full-width">
+                            <table class="table">
+                                <tbody>
+                                    <tr>
+                                        <td>구간 A</td>
+                                        <td>손상 감지 (균열)</td>
+                                        <td class="td-actions text-right">
+                                            <button type="button" rel="tooltip" title="상세 보기" class="btn btn-info btn-simple btn-xs">
+                                                <i class="fa fa-search"></i>
+                                            </button>
+                                        </td>
+                                    </tr>
+                                    <tr>
+                                        <td>구간 B</td>
+                                        <td>정상</td>
+                                        <td class="td-actions text-right">
+                                            <button type="button" rel="tooltip" title="상세 보기" class="btn btn-info btn-simple btn-xs">
+                                                <i class="fa fa-search"></i>
+                                            </button>
+                                        </td>
+                                    </tr>
+                                    <tr>
+                                        <td>구간 C</td>
+                                        <td>파손 심각</td>
+                                        <td class="td-actions text-right">
+                                            <button type="button" rel="tooltip" title="상세 보기" class="btn btn-info btn-simple btn-xs">
+                                                <i class="fa fa-search"></i>
+                                            </button>
+                                        </td>
+                                    </tr>
+                                    <!-- 추가 구간들 계속 추가 가능 -->
+                                </tbody>
+                            </table>
+                        </div>
+                        <div class="footer">
+                            <hr>
+                            <div class="stats">
+                                <i class="fa fa-history"></i> 3분 전 업데이트
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+
+        </div>
+    </div>
+</div>

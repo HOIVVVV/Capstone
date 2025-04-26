@@ -1,0 +1,19 @@
+<div class="sidebar-wrapper">
+    <div class="logo">
+        <a href="/" class="simple-text">
+            <div class="logo-img">
+                <img src="/assets/img/my-logo.png"/> <!-- 내 로고 교체 -->
+            </div>
+            하수관 관리 시스템
+        </a>
+    </div>
+
+    <ul class="nav responsive-nav">
+        <li routerLinkActive="active" *ngFor="let menuItem of menuItems" class="{{menuItem.class}}">
+            <a [routerLink]="[menuItem.path]">
+                <i class="{{menuItem.icon}}"></i>
+                <p>{{menuItem.title}}</p>
+            </a>
+        </li>
+    </ul>
+</div>

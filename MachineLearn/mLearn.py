@@ -8,29 +8,28 @@ from torch.cuda.amp import autocast, GradScaler
 from torch.optim import lr_scheduler
 from torchvision.models import resnext50_32x4d, ResNeXt50_32X4D_Weights
 from torch.utils.data import Dataset, DataLoader, random_split
-from PIL import Image
+from PIL import Image, ImageFile
 from sklearn.metrics import f1_score, accuracy_score, classification_report
+from torchvision.transforms.functional import to_pil_image
+from concurrent.futures import ThreadPoolExecutor
 import numpy as np
 
-print("PyTorch 버전:", torch.__version__)
-print("CUDA 사용 가능:", torch.cuda.is_available())
-if torch.cuda.is_available():
-    print("GPU 이름:", torch.cuda.get_device_name(0))
-    print("CUDA 버전:", torch.version.cuda)
-else:
-    print("❌ CUDA 사용 불가. CPU만 사용 중입니다.")
+ImageFile.LOAD_TRUNCATED_IMAGES = True
 
-# ✅ 1. Custom Dataset
+# ✅ 전처리 Dataset - 저장용 transform만 적용
 class CustomDataset(Dataset):
-    def __init__(self, json_path, transform=None):
+    def __init__(self, json_path, transform=None, root_dir="", exclude_corrupted_paths=None):
         with open(json_path, "r", encoding="utf-8") as f:
             data = json.load(f)
 
+        self.root_dir = root_dir
         self.transform = transform
         self.images = {img["id"]: img for img in data["images"]}
         self.annotations = data["annotations"]
+        
+        # ✅ CustomDataset에서 binary classification용 라벨 생성
+        self.binary_class_map = {"OUT": 0}  # 외부 → 0, 나머지 → 1
 
-        # 클래스 코드 추출 및 라벨 매핑
         self.class_codes = sorted({
             ann["attributes"]["Class_code"]
             for ann in self.annotations
@@ -40,147 +39,196 @@ class CustomDataset(Dataset):
 
         self.items = []
         for ann in self.annotations:
-            # 해당 annotation의 이미지 정보 가져오기
             image_info = self.images[ann["image_id"]]
             image_path = image_info["file_path"]
+            if not os.path.isabs(image_path) and self.root_dir:
+                image_path = os.path.join(self.root_dir, image_path)
 
-            # 해당 annotation에서 'Class_code' 추출
+            if exclude_corrupted_paths and image_path in exclude_corrupted_paths:
+                continue
+
+            #if "attributes" in ann and "Class_code" in ann["attributes"]:
+            #   label_code = ann["attributes"]["Class_code"]
+            #  label_key = self.class_map[label_code]
+            #    self.items.append((image_path, label_key))
+                
             if "attributes" in ann and "Class_code" in ann["attributes"]:
                 label_code = ann["attributes"]["Class_code"]
-
-                # 추출된 'Class_code'로 라벨 매핑
-                label_key = self.class_map[label_code]
-                self.items.append((image_path, label_key))
+                binary_label = self.binary_class_map.get(label_code, 1)  # OUT이면 0, 그 외는 1
+                self.items.append((image_path, binary_label))
 
     def __len__(self):
         return len(self.items)
 
     def __getitem__(self, idx):
         img_path, label = self.items[idx]
-        full_path = img_path
-        image = Image.open(full_path).convert("RGB")
+        try:
+            image = Image.open(img_path).convert("RGB")
+        except Exception as e:
+            return self.__getitem__((idx + 1) % len(self.items))
 
         if self.transform:
             image = self.transform(image)
 
         return image, label
 
-# ✅ 2. 모델 가중치 로딩 및 transform 정의
-weights = ResNeXt50_32X4D_Weights.DEFAULT
+    @staticmethod
+    def check_images(image_paths, output_txt="corrupted_images.txt"):
+        corrupted = []
+        for path in image_paths:
+            if not os.path.exists(path):
+                corrupted.append(path)
+                continue
+            try:
+                with Image.open(path) as img:
+                    img.verify()
+            except:
+                corrupted.append(path)
 
-# 학습용 transform (데이터 증강 포함)
-train_transform = transforms.Compose([
-    transforms.Resize(232),
-    transforms.RandomResizedCrop(224),         # 무작위 자르기 (데이터 증강)
-    transforms.RandomHorizontalFlip(),         # 수평 뒤집기
-    transforms.RandomRotation(30),             # 회전
-    transforms.ToTensor(),                     # PIL → Tensor
-    transforms.Normalize(mean=[0.485, 0.456, 0.406], std=[0.229, 0.224, 0.225])  # 정규화
-])
+        with open(output_txt, "w", encoding="utf-8") as f:
+            for path in corrupted:
+                f.write(path + "\n")
 
-# 검증용 transform (기본 전처리만)
-val_transform = weights.transforms()
+        return corrupted
 
-# 데이터셋 정의
-dataset = CustomDataset("merged_annotations.json", transform=None)  # 전체 데이터셋
-train_size = int(0.9 * len(dataset))
-val_size = len(dataset) - train_size
-train_dataset, val_dataset = random_split(dataset, [train_size, val_size])
+# ✅ 학습 시점에서 transform 적용하는 Dataset
+class PreprocessedDataset(Dataset):
+    def __init__(self, folder_path, transform=None):
+        self.files = sorted(os.listdir(folder_path))
+        self.folder_path = folder_path
+        self.transform = transform
 
-# transform 주입
-train_dataset.dataset.transform = train_transform
-val_dataset.dataset.transform = val_transform
+    def __len__(self):
+        return len(self.files)
 
-# ✅ pin_memory=True 로 GPU 전송 최적화
-train_loader = DataLoader(train_dataset, batch_size=32, shuffle=True, pin_memory=True)
-val_loader = DataLoader(val_dataset, batch_size=32, shuffle=False, pin_memory=True)
+    def __getitem__(self, idx):
+        data = torch.load(os.path.join(self.folder_path, self.files[idx]))  # ← dict 반환
+        img_tensor = data["img"]
+        label = data["label"]
 
-# ✅ 4. 모델 설정
-device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
-print(f"✅ 현재 사용 중인 디바이스: {device}")
+        if isinstance(img_tensor, np.ndarray):
+            img_tensor = torch.from_numpy(img_tensor).permute(2, 0, 1).float() / 255.0
+            
+        if self.transform:
+            img_tensor = self.transform(img_tensor)
 
-# ✅ 성능 최적화
-if device.type == 'cuda':
-    torch.backends.cudnn.benchmark = True
+        return img_tensor, label
 
-model = resnext50_32x4d(weights=weights)
-num_classes = len(dataset.class_map)
-model.fc = nn.Linear(model.fc.in_features, num_classes)
-model = model.to(device)
+def main():
+    weights = ResNeXt50_32X4D_Weights.DEFAULT
 
-# ✅ 5. 학습 설정
-criterion = nn.CrossEntropyLoss()
-optimizer = optim.Adam(model.parameters(), lr=0.001)
+    # transform 저장용 (이미지 크기만 조정)
+    base_transform = transforms.Compose([
+        transforms.Resize(232),
+        transforms.CenterCrop(224),
+        transforms.ToTensor()
+    ])
 
-# ✅ 6. 학습 루프
-# 혼합 정밀도
-scaler = GradScaler()
+    # 매 epoch마다 적용될 학습용 transform
+    train_transform = transforms.Compose([
+        transforms.RandomHorizontalFlip(),
+        transforms.RandomRotation(30),
+        transforms.Normalize(mean=[0.485, 0.456, 0.406], std=[0.229, 0.224, 0.225])
+    ])
 
-# 학습률 스케줄러
-scheduler = lr_scheduler.StepLR(optimizer, step_size=5, gamma=0.1)
+    val_transform = transforms.Compose([
+        transforms.Normalize(mean=[0.485, 0.456, 0.406], std=[0.229, 0.224, 0.225])
+    ])
 
-# 데이터 증강
-transform = transforms.Compose([
-    transforms.RandomHorizontalFlip(),
-    transforms.RandomRotation(30),
-    transforms.ToTensor(),
-    transforms.Normalize(mean=[0.485, 0.456, 0.406], std=[0.229, 0.224, 0.225])
-])
+    corrupted_txt = "corrupted_images.txt"
+    if os.path.exists(corrupted_txt):
+        with open(corrupted_txt, "r", encoding="utf-8") as f:
+            corrupted_paths = [line.strip() for line in f.readlines()]
+    else:
+        temp_dataset = CustomDataset("학습데이터/merged_annotations.json", transform=None)
+        corrupted_paths = CustomDataset.check_images([img_path for img_path, _ in temp_dataset.items], corrupted_txt)
 
-# 학습 루프
-num_epochs = 10
-for epoch in range(num_epochs):
-    model.train()
-    running_loss = 0.0
+    dataset = CustomDataset("학습데이터/merged_annotations.json", transform=base_transform, exclude_corrupted_paths=corrupted_paths)
 
-    for images, labels in train_loader:
-        images = images.to(device)
-        labels = labels.to(device)
+    preprocessed_dir = "preprocessed"
+    if not os.path.exists(preprocessed_dir) or len(os.listdir(preprocessed_dir)) == 0:
+        os.makedirs(preprocessed_dir, exist_ok=True)
+        for i, (img, label) in enumerate(dataset):
+            # transform 적용된 tensor → PIL 이미지로 되돌리기 (만약 transform이 있었다면)
+            if isinstance(img, torch.Tensor):
+                img = to_pil_image(img)
+            img_np = np.array(img)  # numpy array 형태로 저장
+            torch.save({"img": img_np, "label": label}, os.path.join(preprocessed_dir, f"img_{i}.pt"))
+        print(f"✅ 전처리 완료: {i + 1}개 저장됨")
 
-        optimizer.zero_grad()
+    # 파일명 정렬 (순서를 고정시켜야 재현 가능성 ↑)
+    files = sorted(os.listdir(preprocessed_dir))
 
-        # 혼합 정밀도
-        with autocast():
+    # 병렬로 라벨만 로드
+    def load_label(filename):
+        path = os.path.join(preprocessed_dir, filename)
+        return torch.load(path)["label"]
+
+    # ✅ 병렬 처리 (최대 8개 쓰레드 사용)
+    with ThreadPoolExecutor(max_workers=8) as executor:
+        labels = list(executor.map(load_label, files))
+
+    #num_classes = max(labels) + 1
+    # ✅ num_classes 고정 (2개 클래스)
+    num_classes = 2
+    dataset = PreprocessedDataset(preprocessed_dir, transform=None)
+
+    train_size = int(0.9 * len(dataset))
+    val_size = len(dataset) - train_size
+    train_dataset, val_dataset = random_split(dataset, [train_size, val_size])
+    train_dataset.dataset.transform = train_transform
+    val_dataset.dataset.transform = val_transform
+
+    train_loader = DataLoader(train_dataset, batch_size=32, shuffle=True, num_workers=8, pin_memory=True)
+    val_loader = DataLoader(val_dataset, batch_size=32, shuffle=False, num_workers=8, pin_memory=True)
+
+    device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
+    model = resnext50_32x4d(weights=weights)
+    model.fc = nn.Linear(model.fc.in_features, num_classes)
+    model = model.to(device)
+
+    criterion = nn.CrossEntropyLoss()
+    optimizer = optim.Adam(model.parameters(), lr=0.001)
+    scaler = GradScaler()
+    scheduler = lr_scheduler.StepLR(optimizer, step_size=5, gamma=0.1)
+
+    num_epochs = 10
+    for epoch in range(num_epochs):
+        model.train()
+        running_loss = 0.0
+
+        for images, labels in train_loader:
+            images, labels = images.to(device), labels.to(device)
+            optimizer.zero_grad()
+            with autocast():
+                outputs = model(images)
+                loss = criterion(outputs, labels)
+            scaler.scale(loss).backward()
+            scaler.step(optimizer)
+            scaler.update()
+            running_loss += loss.item()
+
+        scheduler.step()
+        print(f"[Epoch {epoch+1}] Loss: {running_loss / len(train_loader):.4f}")
+
+    model.eval()
+    all_preds, all_labels = [], []
+    with torch.no_grad():
+        for images, labels in val_loader:
+            images, labels = images.to(device), labels.to(device)
             outputs = model(images)
-            loss = criterion(outputs, labels)
+            _, preds = torch.max(outputs, 1)
+            all_preds.extend(preds.cpu().numpy())
+            all_labels.extend(labels.cpu().numpy())
 
-        scaler.scale(loss).backward()
-        scaler.step(optimizer)
-        scaler.update()
+    print("Accuracy:", accuracy_score(all_labels, all_preds))
+    print("Weighted F1:", f1_score(all_labels, all_preds, average="weighted"))
+    print(classification_report(all_labels, all_preds)) 
+        
+    torch.save(model.state_dict(), "resnext_model.pth4")
+    print("✅ 모델 저장 완료: resnext_model.pth4")
 
-        running_loss += loss.item()
-
-    scheduler.step()  # 학습률 스케줄링
-    print(f"[{epoch+1}/{num_epochs}] Loss: {running_loss / len(train_loader):.4f}")
-# ✅ 7. 평가 (Top-1 Accuracy, Weighted F1 Score, 클래스별 F1 스코어)
-from sklearn.metrics import classification_report
-
-model.eval()
-all_preds = []
-all_labels = []
-
-with torch.no_grad():
-    for images, labels in val_loader:
-        images = images.to(device, non_blocking=True)
-        labels = labels.to(device, non_blocking=True)
-        outputs = model(images)
-        _, preds = torch.max(outputs, 1)
-        all_preds.extend(preds.cpu().numpy())
-        all_labels.extend(labels.cpu().numpy())
-
-# ✅ 전체 F1, Accuracy
-f1_weighted = f1_score(all_labels, all_preds, average="weighted")
-acc = accuracy_score(all_labels, all_preds)
-
-# ✅ 클래스별 F1 Score
-class_f1 = f1_score(all_labels, all_preds, average=None)
-report = classification_report(all_labels, all_preds, target_names=list(dataset.class_map.keys()))
-
-print(f"\n✅ 평가 결과 (Validation Set)")
-print(f"Top-1 Accuracy: {acc:.4f}")
-print(f"Weighted F1 Score: {f1_weighted:.4f}")
-print(f"\n📊 클래스별 F1 Score:\n{report}")
-
-# ✅ 8. 모델 저장
-torch.save(model.state_dict(), "resnext_model.pth")
-print("✅ 모델 저장 완료: resnext_model.pth")
+if __name__ == "__main__":
+    from multiprocessing import freeze_support
+    freeze_support()
+    main()
