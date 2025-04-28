@@ -1,38 +1,42 @@
 <nav class="navbar navbar-default">
-    <div class="container-fluid">
-      <div class="navbar-header">
-        <button type="button" class="navbar-toggle" data-toggle="collapse" (click)="sidebarToggle()">
-          <span class="sr-only">Toggle navigation</span>
-          <span class="icon-bar"></span>
-          <span class="icon-bar"></span>
-          <span class="icon-bar"></span>
-        </button>
-        <a class="navbar-brand" href="#">하수관로 점검 시스템</a>
-      </div>
-  
-      <div class="collapse navbar-collapse">
-        <ul class="nav navbar-nav navbar-left">
-          <li>
-            <a href="#">
-              <i class="fa fa-search"></i>
-              <p class="hidden-lg hidden-md">검색</p>
-            </a>
-          </li>
-        </ul>
-  
-        <ul class="nav navbar-nav navbar-right">
-          <li>
-            <a href="#">
-              시스템 소개
-            </a>
-          </li>
-          <li>
-            <a href="#">
-              문의하기
-            </a>
-          </li>
-        </ul>
-      </div>
+  <div class="container-fluid">
+
+    <!-- 햄버거·사이드바 토글 -->
+    <div class="navbar-header">
+      <button type="button" class="navbar-toggle" data-toggle="collapse" (click)="sidebarToggle()">
+        <span class="sr-only">Toggle navigation</span>
+        <span class="icon-bar"></span><span class="icon-bar"></span><span class="icon-bar"></span>
+      </button>
     </div>
-  </nav>
-  
+
+    <div class="collapse navbar-collapse">
+
+     <!-- 🔍 검색창 : 아이콘 + 입력창 (한 줄, 좌측 정렬, 테두리 박스) -->
+     <form class="navbar-form navbar-left" (ngSubmit)="onSearch()" style="margin:10px 0 0 0;"> <!-- 여기 margin-top:10px 추가 -->
+      <div class="input-group" style="border:1px solid #ccc; border-radius:4px; overflow:hidden; height:40px; display:flex; align-items:center;">
+        
+        <!-- 검색 아이콘 -->
+        <span style="background:white; border:none; display:flex; align-items:center; padding:0 10px; height:100%;">
+          <i class="fa fa-search" style="font-size:16px; color:#555;"></i>
+        </span>
+    
+        <!-- 입력창 -->
+        <input type="text"
+               class="form-control"
+               placeholder="결과 검색..."
+               [(ngModel)]="query"
+               name="query"
+               required
+               style="border:none; box-shadow:none; height:100%; width:200px; font-size:14px; color:black;">
+      </div>
+    </form>
+    
+
+      <!-- 우측 상단 메뉴 -->
+      <ul class="nav navbar-nav navbar-right">
+        <li><a routerLink="/info">시스템 소개</a></li>
+      </ul>
+
+    </div>
+  </div>
+</nav>
