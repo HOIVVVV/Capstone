@@ -11,11 +11,11 @@ declare interface RouteInfo {
 
 // ✨ 새로운 하수관 관리용 메뉴 리스트
 export const ROUTES: RouteInfo[] = [
-    { path: '/dashboard', title: '대시보드', icon: 'pe-7s-graph', class: '' },
-    { path: '/inspection', title: '관로 점검 결과', icon: 'pe-7s-search', class: '' },
-    { path: '/damage-stats', title: '손상 통계', icon: 'pe-7s-graph3', class: '' },
-    { path: '/reports', title: '보고서 생성', icon: 'pe-7s-note2', class: '' },
-    { path: '/settings', title: '환경 설정', icon: 'pe-7s-tools', class: '' },
+  { path: '/dashboard', title: '대시보드', icon: 'pe-7s-graph', class: '' },
+  { path: '/inspection', title: '관로 점검 결과', icon: 'pe-7s-search', class: '' },
+  { path: '/damage-stats', title: '손상 통계', icon: 'pe-7s-graph3', class: '' },
+  { path: '/mapping', title: '손상도 매핑', icon: 'pe-7s-map', class: '' },       // ✅ 추가
+  { path: '/analyze', title: '하수관로 손상 분석', icon: 'pe-7s-graph2', class: '' } // ✅ 추가
 ];
 
 @Component({

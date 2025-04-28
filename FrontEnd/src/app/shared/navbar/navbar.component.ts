@@ -1,66 +1,68 @@
 import { Component, OnInit, ElementRef } from '@angular/core';
 import { ROUTES } from '../../sidebar/sidebar.component';
-import {Location, LocationStrategy, PathLocationStrategy} from '@angular/common';
+import { Location } from '@angular/common';
+import { Router } from '@angular/router';            // 🆕 라우터 불러오기
 
 @Component({
-    // moduleId: module.id,
-    selector: 'navbar-cmp',
-    templateUrl: 'navbar.component.html'
+  selector: 'navbar-cmp',
+  templateUrl: 'navbar.component.html'
 })
+export class NavbarComponent implements OnInit {
+  private listTitles: any[];
+  location: Location;
+  private toggleButton: any;
+  private sidebarVisible = false;
+  query = '';                                        // 🆕 검색어 바인딩 변수
 
-export class NavbarComponent implements OnInit{
-    private listTitles: any[];
-    location: Location;
-    private toggleButton: any;
-    private sidebarVisible: boolean;
+  constructor(
+    location: Location,
+    private element: ElementRef,
+    private router: Router                           // 🆕 라우터 주입
+  ) {
+    this.location = location;
+  }
 
-    constructor(location: Location,  private element: ElementRef) {
-      this.location = location;
-          this.sidebarVisible = false;
-    }
+  ngOnInit(): void {
+    this.listTitles = ROUTES.filter(listTitle => listTitle);
+    const navbar: HTMLElement = this.element.nativeElement;
+    this.toggleButton = navbar.getElementsByClassName('navbar-toggle')[0];
+  }
 
-    ngOnInit(){
-      this.listTitles = ROUTES.filter(listTitle => listTitle);
-      const navbar: HTMLElement = this.element.nativeElement;
-      this.toggleButton = navbar.getElementsByClassName('navbar-toggle')[0];
-    }
-    sidebarOpen() {
-        const toggleButton = this.toggleButton;
-        const body = document.getElementsByTagName('body')[0];
-        setTimeout(function(){
-            toggleButton.classList.add('toggled');
-        }, 500);
-        body.classList.add('nav-open');
+  /* ───── 사이드바 토글 메서드 그대로 ───── */
+  sidebarOpen(): void {
+    setTimeout(() => this.toggleButton.classList.add('toggled'), 500);
+    document.body.classList.add('nav-open');
+    this.sidebarVisible = true;
+  }
 
-        this.sidebarVisible = true;
-    };
-    sidebarClose() {
-        const body = document.getElementsByTagName('body')[0];
-        this.toggleButton.classList.remove('toggled');
-        this.sidebarVisible = false;
-        body.classList.remove('nav-open');
-    };
-    sidebarToggle() {
-        // const toggleButton = this.toggleButton;
-        // const body = document.getElementsByTagName('body')[0];
-        if (this.sidebarVisible === false) {
-            this.sidebarOpen();
-        } else {
-            this.sidebarClose();
-        }
-    };
+  sidebarClose(): void {
+    this.toggleButton.classList.remove('toggled');
+    document.body.classList.remove('nav-open');
+    this.sidebarVisible = false;
+  }
 
-    getTitle(){
-      var titlee = this.location.prepareExternalUrl(this.location.path());
-      if(titlee.charAt(0) === '#'){
-          titlee = titlee.slice( 1 );
+  sidebarToggle(): void {
+    this.sidebarVisible ? this.sidebarClose() : this.sidebarOpen();
+  }
+
+  /* ───── 검색 실행 메서드 추가 ───── */
+  onSearch(): void {                                 // 🆕
+    const keyword = this.query.trim();
+    if (!keyword) { return; }
+    this.router.navigate(['/search-results'], { queryParams: { q: keyword } });
+    this.query = '';                                 // 입력창 초기화
+  }
+
+  /* ───── 현재 페이지 타이틀 반환 ───── */
+  getTitle(): string {
+    let titlee = this.location.prepareExternalUrl(this.location.path());
+    if (titlee.charAt(0) === '#') { titlee = titlee.slice(1); }
+
+    for (let item = 0; item < this.listTitles.length; item++) {
+      if (this.listTitles[item].path === titlee) {
+        return this.listTitles[item].title;
       }
-
-      for(var item = 0; item < this.listTitles.length; item++){
-          if(this.listTitles[item].path === titlee){
-              return this.listTitles[item].title;
-          }
-      }
-      return 'Dashboard';
     }
+    return 'Dashboard';
+  }
 }

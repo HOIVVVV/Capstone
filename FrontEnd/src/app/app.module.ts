@@ -16,6 +16,10 @@ import { InspectionComponent } from './inspection/inspection.component';
 import { DamageStatsComponent } from './damage-stats/damage-stats.component';
 import { ReportsComponent } from './reports/reports.component';
 import { SettingsComponent } from './settings/settings.component';
+import { MappingComponent } from './mapping/mapping.component';
+import { AnalyzeComponent } from './analyze/analyze.component';
+import { InfoComponent } from './info/info.component';
+import { SearchResultsComponent } from './search-results/search-results.component';
 
 @NgModule({
   imports: [
@@ -31,6 +35,10 @@ import { SettingsComponent } from './settings/settings.component';
   declarations: [
     AppComponent,
     AdminLayoutComponent,
+    MappingComponent,
+    AnalyzeComponent,
+    InfoComponent,
+    SearchResultsComponent,
   ],
   providers: [],
   bootstrap: [AppComponent]

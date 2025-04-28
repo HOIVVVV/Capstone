@@ -7,4 +7,14 @@
 DatasetMake.py 데이터셋 이미지 파일메 맞춰, annotations.json 파일을 수정하는 코드
 mLearn.py resNet50xt 모델로 이미지 학습 코드
 app.py 앱 실행 파일
-routes/main.py route 정의 및 구현 파일일
+main.py app.py 백엔드 구현 파일
+routes/main.py route 정의 및 구현 파일
+FrontEnd Angualar 프론트엔드 파일 
+
+
+###Angular 실행법###
+1.node.js 설치 (cmd에 node -v 쳐서 버전 안뜨면 설치)
+2.VScode 실행, cd FrontEnd 쳐서 Angualr 루트로 이동, cmd 터미널에 npm install
+3.이후 npm install -g @angular/cli 
+4.ng serve로 실행
+5.http://localhost:4200 로 접속
