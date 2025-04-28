@@ -159,7 +159,7 @@ export class HomeComponent implements OnInit {
         }]
       ];
       this.sectionDamageChartLegendItems = [
-        { title: '손상률 (%)', imageClass: 'fa fa-circle text-warning' }
+        { title: '손상 건수', imageClass: 'fa fa-circle text-warning' }
       ];
 
       this.monthlyDamageChartType = ChartType.Bar;
