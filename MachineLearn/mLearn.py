@@ -28,7 +28,7 @@ class CustomDataset(Dataset):
         self.annotations = data["annotations"]
         
         # ✅ CustomDataset에서 binary classification용 라벨 생성
-        self.binary_class_map = {"OUT": 0}  # 외부 → 0, 나머지 → 1
+        #self.binary_class_map = {"OUT": 0}  # 외부 → 0, 나머지 → 1
 
         self.class_codes = sorted({
             ann["attributes"]["Class_code"]
@@ -47,15 +47,15 @@ class CustomDataset(Dataset):
             if exclude_corrupted_paths and image_path in exclude_corrupted_paths:
                 continue
 
-            #if "attributes" in ann and "Class_code" in ann["attributes"]:
-            #   label_code = ann["attributes"]["Class_code"]
-            #  label_key = self.class_map[label_code]
-            #    self.items.append((image_path, label_key))
-                
             if "attributes" in ann and "Class_code" in ann["attributes"]:
                 label_code = ann["attributes"]["Class_code"]
-                binary_label = self.binary_class_map.get(label_code, 1)  # OUT이면 0, 그 외는 1
-                self.items.append((image_path, binary_label))
+                label_key = self.class_map[label_code]
+                self.items.append((image_path, label_key))
+                
+            #if "attributes" in ann and "Class_code" in ann["attributes"]:
+            #    label_code = ann["attributes"]["Class_code"]
+            #    binary_label = self.binary_class_map.get(label_code, 1)  # OUT이면 0, 그 외는 1
+            #    self.items.append((image_path, binary_label))
 
     def __len__(self):
         return len(self.items)
@@ -126,9 +126,16 @@ def main():
 
     # 매 epoch마다 적용될 학습용 transform
     train_transform = transforms.Compose([
-        transforms.RandomHorizontalFlip(),
-        transforms.RandomRotation(30),
-        transforms.Normalize(mean=[0.485, 0.456, 0.406], std=[0.229, 0.224, 0.225])
+        transforms.RandomResizedCrop(224, scale=(0.8, 1.2)),          # 다양한 스케일 학습
+        transforms.RandomHorizontalFlip(),                             # 좌우 반전
+        transforms.RandomRotation(30),                                 # 회전
+        transforms.ColorJitter(brightness=0.3, contrast=0.3,           # 밝기, 대비 등 조절
+                            saturation=0.3, hue=0.1),
+        transforms.RandomGrayscale(p=0.1),                             # 일부 흑백 처리
+        transforms.GaussianBlur(kernel_size=3),                        # 블러 처리
+        transforms.ToTensor(),                                         # 텐서 변환
+        transforms.Normalize(mean=[0.485, 0.456, 0.406],               # 정규화
+                            std=[0.229, 0.224, 0.225])
     ])
 
     val_transform = transforms.Compose([
@@ -145,7 +152,7 @@ def main():
 
     dataset = CustomDataset("학습데이터/merged_annotations.json", transform=base_transform, exclude_corrupted_paths=corrupted_paths)
 
-    preprocessed_dir = "preprocessed"
+    preprocessed_dir = "preprocessed2"
     if not os.path.exists(preprocessed_dir) or len(os.listdir(preprocessed_dir)) == 0:
         os.makedirs(preprocessed_dir, exist_ok=True)
         for i, (img, label) in enumerate(dataset):
@@ -168,9 +175,8 @@ def main():
     with ThreadPoolExecutor(max_workers=8) as executor:
         labels = list(executor.map(load_label, files))
 
-    #num_classes = max(labels) + 1
-    # ✅ num_classes 고정 (2개 클래스)
-    num_classes = 2
+    num_classes = max(labels) + 1
+    #num_classes = 2
     dataset = PreprocessedDataset(preprocessed_dir, transform=None)
 
     train_size = int(0.9 * len(dataset))

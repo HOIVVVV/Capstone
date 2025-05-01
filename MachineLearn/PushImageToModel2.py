@@ -29,10 +29,10 @@ model = resnext50_32x4d(weights=weights)
 
 # 마지막 레이어의 출력 크기 수정 (예: 12개 클래스로 fine-tune)
 num_features = model.fc.in_features
-model.fc = torch.nn.Linear(num_features, 12)  # 12개의 클래스로 수정
+model.fc = torch.nn.Linear(num_features, 11)  # 12개의 클래스로 수정
 
 # 학습된 모델 가중치 불러오기
-checkpoint = torch.load("resnext_model.pth3")
+checkpoint = torch.load("resnext_model.pth4")
 model.load_state_dict(checkpoint, strict=False)  # strict=False로 하여 미ismatch된 가중치는 무시
 
 model.eval()  # 평가 모드로 설정
@@ -110,7 +110,8 @@ def predict_image(image_path, save_path):
 
     # 예측 결과 반환
     top3_results = [
-        (class_map[top3_preds[0][i].item()], top3_probs[0][i].item())
+        (class_map.get(top3_preds[0][i].item(), f"Unknown({top3_preds[0][i].item()})"), 
+        top3_probs[0][i].item())
         for i in range(3)
     ]
     return top3_results
