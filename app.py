@@ -28,7 +28,7 @@ os.makedirs(FRAME_FOLDER, exist_ok=True)
 app.register_blueprint(main)
 
 # 첫 요청 전에 DB 생성
-@app.before_first_request
+@app.before_request
 def setup():
     initialize_database()
 

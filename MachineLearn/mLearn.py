@@ -102,7 +102,8 @@ class PreprocessedDataset(Dataset):
         return len(self.files)
 
     def __getitem__(self, idx):
-        data = torch.load(os.path.join(self.folder_path, self.files[idx]))  # ← dict 반환
+        #data = torch.load(os.path.join(self.folder_path, self.files[idx]))  # ← dict 반환
+        data = torch.load(os.path.join(self.folder_path, self.files[idx]), weights_only=False)
         img_tensor = data["img"]
         label = data["label"]
 
@@ -141,6 +142,8 @@ def main():
     val_transform = transforms.Compose([
         transforms.Normalize(mean=[0.485, 0.456, 0.406], std=[0.229, 0.224, 0.225])
     ])
+    
+    print(torch.cuda.is_available())  # True 나와야 GPU 사용 가능
 
     corrupted_txt = "corrupted_images.txt"
     if os.path.exists(corrupted_txt):
@@ -154,6 +157,7 @@ def main():
 
     preprocessed_dir = "preprocessed2"
     if not os.path.exists(preprocessed_dir) or len(os.listdir(preprocessed_dir)) == 0:
+        print(f"proprocessed된 폴더 없음 생성 시작")
         os.makedirs(preprocessed_dir, exist_ok=True)
         for i, (img, label) in enumerate(dataset):
             # transform 적용된 tensor → PIL 이미지로 되돌리기 (만약 transform이 있었다면)
@@ -169,7 +173,8 @@ def main():
     # 병렬로 라벨만 로드
     def load_label(filename):
         path = os.path.join(preprocessed_dir, filename)
-        return torch.load(path)["label"]
+        #return torch.load(path)["label"]
+        return torch.load(path, weights_only=False)["label"]
 
     # ✅ 병렬 처리 (최대 8개 쓰레드 사용)
     with ThreadPoolExecutor(max_workers=8) as executor:
@@ -231,8 +236,8 @@ def main():
     print("Weighted F1:", f1_score(all_labels, all_preds, average="weighted"))
     print(classification_report(all_labels, all_preds)) 
         
-    torch.save(model.state_dict(), "resnext_model.pth4")
-    print("✅ 모델 저장 완료: resnext_model.pth4")
+    torch.save(model.state_dict(), "resnext_model.pth5")
+    print("✅ 모델 저장 완료: resnext_model.pth5")
 
 if __name__ == "__main__":
     from multiprocessing import freeze_support

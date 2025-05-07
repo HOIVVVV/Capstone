@@ -5,7 +5,7 @@ def initialize_database():
     connection = pymysql.connect(
         host='localhost',
         user='root',
-        password='autoset',
+        password='1234',
         charset='utf8mb4',
         cursorclass=pymysql.cursors.DictCursor
     )

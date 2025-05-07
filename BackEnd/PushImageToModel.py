@@ -33,13 +33,29 @@ num_features = model.fc.in_features
 model.fc = torch.nn.Linear(num_features, 11)  # 12개의 클래스로 수정
 
 # 학습된 모델 가중치 불러오기
-checkpoint = torch.load("resnext_model.pth4")
+checkpoint = torch.load("resnext_model.pth5")
+#checkpoint = torch.load("resnext_model.pth5", map_location=torch.device('cpu'))
 model.load_state_dict(checkpoint, strict=False)  # strict=False로 하여 미ismatch된 가중치는 무시
 
 model.eval()  # 평가 모드로 설정
 
 # 클래스 코드 -> 라벨 매핑
 class_map = get_class_map_from_json("학습데이터/merged_annotations.json")
+
+#class_map = {
+    #0: "Crack-Longitudinal",     # 균열-길이
+    #1: "Crack-Circumferential",  # 균열-원주
+    #2: "Surface-Damage",         # 표면손상
+    #3: "Broken-Pipe",            # 파손
+    #4: "Lateral-Protruding",     # 연결관-돌출
+    #5: "Joint-Faulty",           # 이음부 손상
+    #6: "Joint-Displaced",        # 이음부 단차
+    #7: "Deposits-Silty",         # 토사퇴적
+    #8: "Etc",                    # 기타결함
+    #9: "Pipe-Joint",             # 비손상 - 이음부
+    #10: "Inside",                # 비손상 - 내부
+    #11: "Outside"                # 비손상 - 외부
+#}
 
 
 # 이미지 전처리 (학습과 동일하게 수정)
@@ -55,13 +71,23 @@ def preprocess_image(image_path):
     image = Image.open(image_path).convert("RGB")
     return transform(image).unsqueeze(0)
 
-# 이미지 전처리 및 Grad-CAM 적용 함수
-def predict_image(image_path, save_path):
-    # 원본 이미지 열기
+def predict_images_in_folder(folder_path, save_base_path):
+    for idx, filename in enumerate(sorted(os.listdir(folder_path))):
+        if filename.lower().endswith(('.png', '.jpg', '.jpeg')):
+            image_path = os.path.join(folder_path, filename)
+
+            video_title = os.path.basename(folder_path).split('_')[-1]
+            save_path = os.path.join(save_base_path, video_title)
+            os.makedirs(save_path, exist_ok=True)
+
+            frame_number = idx + 1  # 실제 프레임 순서 (1부터 시작)
+            predict_image(image_path, save_path, video_title, frame_number)
+
+
+def predict_image(image_path, save_path, video_title, frame_number):
     original_image = Image.open(image_path).convert("RGB")
     original_width, original_height = original_image.size
 
-    # 전처리
     preprocess = transforms.Compose([
         transforms.Resize(232),
         transforms.CenterCrop(224),
@@ -75,60 +101,64 @@ def predict_image(image_path, save_path):
     image_tensor = image_tensor.to(device)
     model.to(device)
 
-    # Grad-CAM 객체 생성 (layer4 or layer3 추천)
-    grad_cam = GradCAM(model, target_layer=model.layer4[2].conv3)
-
     with torch.no_grad():
         outputs = model(image_tensor)
         probabilities = torch.nn.functional.softmax(outputs, dim=1)
         top3_probs, top3_preds = torch.topk(probabilities, 3)
 
-    # Grad-CAM 생성
-    cam = grad_cam.generate_cam(image_tensor)
-    
-    if cam is None or np.max(cam) == 0:
-        print("❌ CAM 생성 실패 또는 모든 값이 0입니다.")
-        return []
+    top3_indices = top3_preds[0].tolist()
+    top3_labels = [class_map.get(idx, f"Unknown({idx})") for idx in top3_indices]
+    top3_probs_vals = top3_probs[0].tolist()
+
+    non_damage_labels = ['IN', 'OUT', 'PJ']
+
+    # ✅ 손상 여부 판단
+    if top3_probs_vals[0] >= 0.9:
+        damage_detected = top3_labels[0] not in non_damage_labels
     else:
-        print("✅ CAM 생성 성공. 최대값:", np.max(cam))
+        damage_detected = any(label not in non_damage_labels for label in top3_labels)
 
-    # ✅ CAM을 원본 이미지 크기로 리사이즈
+    if not damage_detected:
+        os.remove(image_path)
+        return []
+
+    # ✅ Grad-CAM 생성
+    grad_cam = GradCAM(model, target_layer=model.layer4[2].conv3)
+    cam = grad_cam.generate_cam(image_tensor)
+
+    if cam is None or np.max(cam) == 0:
+        return top3_labels
+
     cam_resized = cv2.resize(cam, (original_width, original_height))
-
-    # 히트맵 생성 및 오버레이
     heatmap = cv2.applyColorMap(np.uint8(255 * cam_resized), cv2.COLORMAP_JET)
     heatmap = np.float32(heatmap) / 255
     original_np = np.array(original_image) / 255.0
-
     overlay = heatmap + original_np
     overlay = overlay / np.max(overlay)
     overlay = np.uint8(255 * overlay)
 
-    # 저장
-    filename = os.path.splitext(os.path.basename(image_path))[0]
-    save_filepath = os.path.join(save_path, f"{filename}_GradCAM_Overlay.jpg")
-    cv2.imwrite(save_filepath, cv2.cvtColor(overlay, cv2.COLOR_RGB2BGR))
+    # ✅ 파일명 생성
+    frame_tag = f"f{str(frame_number).zfill(3)}"
 
-    # 예측 결과 반환
-    top3_results = [
-        (class_map.get(top3_preds[0][i].item(), f"Unknown({top3_preds[0][i].item()})"), 
-        top3_probs[0][i].item())
-        for i in range(3)
-    ]
-    return top3_results
+    if top3_probs_vals[0] >= 0.9:
+        label_string = f"{top3_labels[0]}({int(top3_probs_vals[0]*100)})"
+    else:
+        label_string = ",".join(
+            f"{label}({int(prob*100)})"
+            for label, prob in zip(top3_labels, top3_probs_vals)
+        )
 
-def predict_images_in_folder(folder_path, save_path):
-    # 폴더 내 모든 이미지 파일을 예측 (png, jpg 파일만)
-    if not os.path.exists(save_path):
-        os.makedirs(save_path)  # 저장할 폴더가 없으면 생성
-        
-    for filename in os.listdir(folder_path):
-        if filename.lower().endswith(('.png', '.jpg', '.jpeg')):  # 확장자 확인
-            image_path = os.path.join(folder_path, filename)  # 이미지 파일 경로
-            top3_results = predict_image(image_path, save_path)  # 예측 수행
-            print(f"{filename}:")
-            for i, (label, prob) in enumerate(top3_results, 1):
-                print(f"  {i}. {label} ({prob*100:.2f}%)")  # 상위 3개 결과 출력
+    base_filename = f"{video_title}_{frame_tag}_{label_string}"
+
+    # ✅ 저장
+    image_save_path = os.path.join(save_path, f"{base_filename}.jpg")
+    gradcam_save_path = os.path.join(save_path, f"{base_filename}_GradCAM.jpg")
+
+    original_image.save(image_save_path)
+    cv2.imwrite(gradcam_save_path, cv2.cvtColor(overlay, cv2.COLOR_RGB2BGR))
+
+    return top3_labels
+
 
 if __name__ == "__main__":
     folder_path = input("예측할 이미지가 있는 폴더 경로를 입력하세요: ")  # 사용자로부터 폴더 경로 입력 받기
@@ -138,3 +168,4 @@ if __name__ == "__main__":
         predict_images_in_folder(folder_path, save_path)  # 폴더 내 모든 이미지 예측
     else:
         print("유효하지 않은 폴더 경로입니다.")
+        
