@@ -1,3 +1,4 @@
+###cpu 사용 버전###
 import os
 import torch
 import cv2
@@ -30,15 +31,29 @@ model = resnext50_32x4d(weights=weights)
 # 마지막 레이어의 출력 크기 수정 (예: 12개 클래스로 fine-tune)
 num_features = model.fc.in_features
 model.fc = torch.nn.Linear(num_features, 11)  # 12개의 클래스로 수정
-
-# 학습된 모델 가중치 불러오기
-checkpoint = torch.load("resnext_model.pth4")
-model.load_state_dict(checkpoint, strict=False)  # strict=False로 하여 미ismatch된 가중치는 무시
+# 모델 가중치 로드
+checkpoint = torch.load("resnext_model.pth4", map_location=torch.device('cpu'))
+model.load_state_dict(checkpoint, strict=False)
 
 model.eval()  # 평가 모드로 설정
 
 # 클래스 코드 -> 라벨 매핑
-class_map = get_class_map_from_json("학습데이터/merged_annotations.json")
+#class_map = get_class_map_from_json("merged_annotations.json")
+
+class_map = {
+    0: "Crack-Longitudinal",     # 균열-길이
+    1: "Crack-Circumferential",  # 균열-원주
+    2: "Surface-Damage",         # 표면손상
+    3: "Broken-Pipe",            # 파손
+    4: "Lateral-Protruding",     # 연결관-돌출
+    5: "Joint-Faulty",           # 이음부 손상
+    6: "Joint-Displaced",        # 이음부 단차
+    7: "Deposits-Silty",         # 토사퇴적
+    8: "Etc",                    # 기타결함
+    9: "Pipe-Joint",             # 비손상 - 이음부
+    10: "Inside",                # 비손상 - 내부
+    11: "Outside"                # 비손상 - 외부
+}
 
 
 # 이미지 전처리 (학습과 동일하게 수정)

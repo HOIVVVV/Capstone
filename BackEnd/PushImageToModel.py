@@ -1,3 +1,4 @@
+###GPU 사용 버전###
 import os
 import torch
 import cv2
@@ -29,19 +30,17 @@ model = resnext50_32x4d(weights=weights)
 
 # 마지막 레이어의 출력 크기 수정 (예: 12개 클래스로 fine-tune)
 num_features = model.fc.in_features
-model.fc = torch.nn.Linear(num_features, 2)  # 12개의 클래스로 수정
+model.fc = torch.nn.Linear(num_features, 11)  # 12개의 클래스로 수정
 
 # 학습된 모델 가중치 불러오기
-checkpoint = torch.load("resnext_binary_model.pth")
+checkpoint = torch.load("resnext_model.pth4")
 model.load_state_dict(checkpoint, strict=False)  # strict=False로 하여 미ismatch된 가중치는 무시
 
 model.eval()  # 평가 모드로 설정
 
 # 클래스 코드 -> 라벨 매핑
-#class_map = get_class_map_from_json("학습데이터/merged_annotations.json")
+class_map = get_class_map_from_json("학습데이터/merged_annotations.json")
 
-# ✅ 클래스 매핑 직접 정의 (이진 분류 전용)
-class_map = {0: "OUT", 1: "IN"}
 
 # 이미지 전처리 (학습과 동일하게 수정)
 def preprocess_image(image_path):
@@ -82,7 +81,7 @@ def predict_image(image_path, save_path):
     with torch.no_grad():
         outputs = model(image_tensor)
         probabilities = torch.nn.functional.softmax(outputs, dim=1)
-        top3_probs, top3_preds = torch.topk(probabilities, 1)
+        top3_probs, top3_preds = torch.topk(probabilities, 3)
 
     # Grad-CAM 생성
     cam = grad_cam.generate_cam(image_tensor)
@@ -112,8 +111,9 @@ def predict_image(image_path, save_path):
 
     # 예측 결과 반환
     top3_results = [
-        (class_map[top3_preds[0][i].item()], top3_probs[0][i].item())
-        for i in range(1)
+        (class_map.get(top3_preds[0][i].item(), f"Unknown({top3_preds[0][i].item()})"), 
+        top3_probs[0][i].item())
+        for i in range(3)
     ]
     return top3_results
 
