@@ -1,30 +1,36 @@
-import logging
-from typing import Counter
-from flask import Flask, request, jsonify, render_template, send_file
-import openai
-import os, io, librosa, torch, base64, librosa.display, zipfile
-import matplotlib.pyplot as plt
-from base64 import b64encode
-import numpy as np
-import seaborn as sns
-import pandas as pd
-from routes import register_routes
-
-# Use a non-GUI backend for Matplotlib
-import matplotlib
-matplotlib.use('Agg')
+# app.py
+from flask import Flask
+from routes.main import main  # 🔥 Blueprint import
+from BackEnd.db.models import db      # 🔥 SQLAlchemy db 객체
+from BackEnd.db.init_db import initialize_database  # 🔥 DB 초기화 함수
+import os
 
 app = Flask(__name__)
 
-# Load the model once when the app starts
-#def load_model(model_path):
- #   return model
+# 폴더 설정
+UPLOAD_FOLDER = 'uploads'
+FRAME_FOLDER = 'frames'
+app.config['UPLOAD_FOLDER'] = UPLOAD_FOLDER
+app.config['FRAME_FOLDER'] = FRAME_FOLDER
 
-#MODEL_PATH = 'models/class_shipsEar.pth'
-#model = load_model(MODEL_PATH)
+# DB 설정
+app.config['SQLALCHEMY_DATABASE_URI'] = 'mysql+pymysql://root:autoset@localhost/capstone'
+app.config['SQLALCHEMY_TRACK_MODIFICATIONS'] = False
 
-app = Flask(__name__)
-register_routes(app)
+# SQLAlchemy 초기화
+db.init_app(app)
+
+# 업로드 폴더 생성
+os.makedirs(UPLOAD_FOLDER, exist_ok=True)
+os.makedirs(FRAME_FOLDER, exist_ok=True)
+
+# Blueprint 등록
+app.register_blueprint(main)
+
+# 첫 요청 전에 DB 생성
+@app.before_request
+def setup():
+    initialize_database()
 
 if __name__ == '__main__':
     app.run(debug=True)

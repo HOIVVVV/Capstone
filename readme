@@ -18,3 +18,8 @@ FrontEnd Angualar 프론트엔드 파일
 3.이후 npm install -g @angular/cli 
 4.ng serve로 실행
 5.http://localhost:4200 로 접속
+
+
+###노트북###
+pip install torch torchvision torchaudio --index-url https://download.pytorch.org/whl/cpu
+
