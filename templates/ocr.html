@@ -1,0 +1,49 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+    <meta charset="UTF-8">
+    <title>OCR 추출기</title>
+</head>
+<body>
+    <h1>이미지 업로드</h1>
+    <input type="file" id="image-input" accept="image/*">
+    <button id="submit-btn">전송</button>
+
+    <h2>결과</h2>
+    <div id="result"></div>
+
+    <script>
+        document.getElementById('submit-btn').addEventListener('click', function () {
+            const file = document.getElementById('image-input').files[0];
+            if (!file) {
+                alert('이미지를 선택하세요.');
+                return;
+            }
+
+            const formData = new FormData();
+            formData.append('image', file);
+
+            fetch('/ocr', {
+                method: 'POST',
+                body: formData
+            })
+            .then(res => res.json())
+            .then(data => {
+                if (data.error) {
+                    alert('오류: ' + data.error);
+                    return;
+                }
+
+                const resultDiv = document.getElementById('result');
+                resultDiv.innerHTML = `
+                    <p>날짜: ${data.date}</p>
+                    <p>구 정보: ${data.district}</p>
+                `;
+            })
+            .catch(err => {
+                alert('요청 실패: ' + err);
+            });
+        });
+    </script>
+</body>
+</html>

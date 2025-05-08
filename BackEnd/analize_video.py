@@ -1,24 +1,52 @@
 import os
 import sys
 import shutil
+import pytesseract
 sys.path.append(os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 from datetime import datetime
-from frame_extractor import extract_frames
+from frame_extractor import extract_frames, extract_key_frames_for_text
 from BackEnd.PushImageToModel import predict_images_in_folder
+from BackEnd.GetTextFromImage import analyze_images_in_folder
+from PIL import Image
 
 def analyze_video(video_path):
     if not os.path.isfile(video_path):
         print("❌ 유효하지 않은 영상 경로입니다.")
         return
 
-    # 고유한 타임스탬프로 임시 폴더 생성
     timestamp = datetime.now().strftime("%Y%m%d_%H%M%S")
     frame_output_folder = f"temp_frames_{timestamp}"
-    
+    frame_output_path = os.path.abspath(frame_output_folder)
+
+    # ✅ 실제 폴더 생성
+    os.makedirs(frame_output_path, exist_ok=True)
+        
     # ✅ 결과 폴더는 'Result/' 아래에 생성
     result_root = "Result"
     result_output_folder = os.path.join(result_root, f"results_{timestamp}")
     os.makedirs(result_output_folder, exist_ok=True)
+    result_output_path = os.path.abspath(result_output_folder)  # ✅ 실제 경로 생성
+    
+    # 🔍 1단계 전: 텍스트 추출용 프레임 추출
+    print("\n📝 텍스트 추출용 프레임 분석 중...")
+    text_frame_paths = extract_key_frames_for_text(video_path, frame_output_folder, max_frames=10)
+
+    if not text_frame_paths:
+        print("❌ 프레임 추출 실패")
+        return
+
+    found_seoul = False
+    all_text = []
+    
+    # OCR 기반 날짜/지역 분석
+    result = analyze_images_in_folder(frame_output_path, result_output_path, frame_output_path)
+
+    if not result:
+        return  # 비서울이면 종료
+
+    # ⬇️ 다음 단계로 이동
+    print("📌 서울 지역으로 판단되어 분석을 계속 진행합니다.")
+    predict_images_in_folder(frame_output_folder, result_output_folder)
 
     # 1단계: 영상 → 프레임 추출
     print("\n📽️ 프레임 추출 중...")
