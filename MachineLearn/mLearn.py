@@ -120,28 +120,28 @@ def main():
 
     # transform 저장용 (이미지 크기만 조정)
     base_transform = transforms.Compose([
-        transforms.Resize(232),
-        transforms.CenterCrop(224),
-        transforms.ToTensor()
-    ])
+    transforms.Resize(232),
+    transforms.CenterCrop(224),
+    transforms.ToTensor(),
+    transforms.Normalize(mean=[0.485, 0.456, 0.406],
+                         std=[0.229, 0.224, 0.225])
+])
 
     # 매 epoch마다 적용될 학습용 transform
     train_transform = transforms.Compose([
-        transforms.RandomResizedCrop(224, scale=(0.8, 1.2)),          # 다양한 스케일 학습
-        transforms.RandomHorizontalFlip(),                             # 좌우 반전
-        transforms.RandomRotation(30),                                 # 회전
-        transforms.ColorJitter(brightness=0.3, contrast=0.3,           # 밝기, 대비 등 조절
-                            saturation=0.3, hue=0.1),
-        transforms.RandomGrayscale(p=0.1),                             # 일부 흑백 처리
-        transforms.GaussianBlur(kernel_size=3),                        # 블러 처리
-        transforms.ToTensor(),                                         # 텐서 변환
-        transforms.Normalize(mean=[0.485, 0.456, 0.406],               # 정규화
-                            std=[0.229, 0.224, 0.225])
-    ])
+    transforms.Resize(232),
+    transforms.CenterCrop(224),
+    transforms.RandomHorizontalFlip(),  # 구조에 큰 영향 없는 수준
+    transforms.ToTensor(),
+    transforms.Normalize(mean=[0.485, 0.456, 0.406],
+                         std=[0.229, 0.224, 0.225])
+])
 
     val_transform = transforms.Compose([
-        transforms.Normalize(mean=[0.485, 0.456, 0.406], std=[0.229, 0.224, 0.225])
-    ])
+    transforms.ToTensor(),
+    transforms.Normalize(mean=[0.485, 0.456, 0.406],
+                         std=[0.229, 0.224, 0.225])
+])
     
     print(torch.cuda.is_available())  # True 나와야 GPU 사용 가능
 
