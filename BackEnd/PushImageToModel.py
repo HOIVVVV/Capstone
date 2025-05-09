@@ -33,29 +33,34 @@ num_features = model.fc.in_features
 model.fc = torch.nn.Linear(num_features, 11)  # 12개의 클래스로 수정
 
 # 학습된 모델 가중치 불러오기
-checkpoint = torch.load("resnext_model.pth5")
-#checkpoint = torch.load("resnext_model.pth5", map_location=torch.device('cpu'))
-model.load_state_dict(checkpoint, strict=False)  # strict=False로 하여 미ismatch된 가중치는 무시
+# CUDA 사용 가능 여부에 따라 자동으로 모델 로딩
+device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
+checkpoint = torch.load("resnext_model.pth5", map_location=device)
+model.load_state_dict(checkpoint, strict=False)
+model.to(device)
 
 model.eval()  # 평가 모드로 설정
 
 # 클래스 코드 -> 라벨 매핑
-class_map = get_class_map_from_json("학습데이터/merged_annotations.json")
-
-#class_map = {
-    #0: "Crack-Longitudinal",     # 균열-길이
-    #1: "Crack-Circumferential",  # 균열-원주
-    #2: "Surface-Damage",         # 표면손상
-    #3: "Broken-Pipe",            # 파손
-    #4: "Lateral-Protruding",     # 연결관-돌출
-    #5: "Joint-Faulty",           # 이음부 손상
-    #6: "Joint-Displaced",        # 이음부 단차
-    #7: "Deposits-Silty",         # 토사퇴적
-    #8: "Etc",                    # 기타결함
-    #9: "Pipe-Joint",             # 비손상 - 이음부
-    #10: "Inside",                # 비손상 - 내부
-    #11: "Outside"                # 비손상 - 외부
-#}
+try:
+    class_map = get_class_map_from_json("학습데이터/merged_annotations.json")
+    print("✅ JSON에서 클래스 맵을 성공적으로 불러왔습니다.")
+except Exception as e:
+    print(f"⚠️ JSON 로딩 실패. 기본 클래스 맵을 사용합니다. 이유: {e}")
+    class_map = {
+        0: "CL",     # 균열-길이
+        1: "CC",  # 균열-원주
+        2: "SD",         # 표면손상
+        3: "BP",            # 파손
+        4: "LP",     # 연결관-돌출
+        5: "JF",           # 이음부 손상
+        6: "JD",        # 이음부 단차
+        7: "DS",         # 토사퇴적
+        8: "Etc",                    # 기타결함
+        9: "PJ",             # 비손상 - 이음부
+        10: "IN",                # 비손상 - 내부
+        11: "OUT"                # 비손상 - 외부
+    }
 
 
 # 이미지 전처리 (학습과 동일하게 수정)
@@ -117,6 +122,12 @@ def predict_image(image_path, save_path, video_title, frame_number):
         damage_detected = top3_labels[0] not in non_damage_labels
     else:
         damage_detected = any(label not in non_damage_labels for label in top3_labels)
+        
+    # ✅ 로그 출력
+    print(f"\n📄 [{os.path.basename(image_path)}] 분석 결과:")
+    for i, (label, prob) in enumerate(zip(top3_labels, top3_probs_vals), 1):
+        print(f"  {i}. {label} ({prob*100:.2f}%)")
+    print("🔍 손상 감지:", "✅ 예" if damage_detected else "❌ 아니오")
 
     if not damage_detected:
         os.remove(image_path)

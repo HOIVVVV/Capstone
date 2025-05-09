@@ -1,0 +1,13 @@
+torch
+torchvision
+torchaudio
+
+pytesseract
+easyocr
+geopy
+
+opencv-python
+numpy
+matplotlib
+scikit-learn
+Pillow

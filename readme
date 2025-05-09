@@ -11,6 +11,13 @@ main.py app.py 백엔드 구현 파일
 routes/main.py route 정의 및 구현 파일
 FrontEnd Angualar 프론트엔드 파일 
 
+###라이브러리 설치###
+1.pip install -r requirements.txt
+
+#pytorch CUDA
+pip install torch torchvision torchaudio --index-url https://download.pytorch.org/whl/cu118
+#pytorch cpu
+pip install torch torchvision torchaudio --index-url https://download.pytorch.org/whl/cpu
 
 ###Angular 실행법###
 1.node.js 설치 (cmd에 node -v 쳐서 버전 안뜨면 설치)
