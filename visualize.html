@@ -7,13 +7,25 @@
             const chartType = document.querySelector("select[name='chart_type']").value;
             const defaultFilters = document.getElementById("default-filters");
             const lineOptionSelector = document.getElementById("line-option-selector");
+            const mapOptionSelector = document.getElementById("map-option-selector");
+            const mapContainer = document.getElementById("map-container");
+
 
             if (chartType === 'line') {
                 defaultFilters.style.display = 'none';
                 lineOptionSelector.style.display = 'block';
+                mapOptionSelector.style.display = 'none';
+                mapContainer.style.display = 'none';
+            } else if (chartType === 'map') {
+                defaultFilters.style.display = 'none';
+                lineOptionSelector.style.display = 'none';
+                mapOptionSelector.style.display = 'block';
+                mapContainer.style.display = 'block';
             } else {
                 defaultFilters.style.display = 'block';
                 lineOptionSelector.style.display = 'none';
+                mapOptionSelector.style.display = 'none';
+                mapContainer.style.display = 'none';
             }
         }
 
@@ -26,9 +38,10 @@
 
         <!-- ✅ 날짜 범위 선택 -->
         <label>시작 날짜:</label>
-        <input type="date" name="start_date" required>
+        <input type="date" name="start_date" value="{{ min_date }}" required>
         <label>종료 날짜:</label>
-        <input type="date" name="end_date" required><br><br>
+        <input type="date" name="end_date" value="{{ max_date }}" required><br><br>
+        
 
         <!-- ✅ 그래프 종류 선택 -->
         <label>그래프 종류 선택:</label>
@@ -38,6 +51,7 @@
             <option value="line">Line 차트</option>
             <option value="heatmap">Heatmap 차트</option>
             <option value="stacked">Stacked 차트</option>
+            <option value="map">Map 차트</option>
         </select><br><br>
 
         <!-- ✅ line 차트 전용 옵션 -->
@@ -48,6 +62,19 @@
                 <option value="quarter">분기별</option>
             </select><br><br>
 
+            <label>손상 유형</label><br>
+            {% for dtype in damage_types %}
+                <input type="checkbox" name="damage_type" value="{{ dtype }}">{{ dtype }}<br>
+            {% endfor %}
+
+            <label>촬영 위치</label><br>
+            {% for loc in locations %}
+                <input type="checkbox" name="location" value="{{ loc }}">{{ loc }}<br>
+            {% endfor %}
+        </div>
+
+        <!-- ✅ map 차트 전용 옵션 -->
+        <div id="map-option-selector" style="display:none;">
             <label>손상 유형</label><br>
             {% for dtype in damage_types %}
                 <input type="checkbox" name="damage_type" value="{{ dtype }}">{{ dtype }}<br>
@@ -74,6 +101,12 @@
 
         <br>
         <input type="submit" value="그래프 생성">
+
+            <!-- ✅ 지도 시각화 영역 -->
+    <div id="map-container" style="display: none;">
+        <h2>지도 시각화</h2>
+        {{ map_html|safe }}
+    </div>
     </form>
 </body>
 </html>
