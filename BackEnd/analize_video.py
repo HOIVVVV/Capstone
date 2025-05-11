@@ -46,7 +46,6 @@ def analyze_video(video_path):
 
     # ⬇️ 다음 단계로 이동
     print("📌 서울 지역으로 판단되어 분석을 계속 진행합니다.")
-    predict_images_in_folder(frame_output_folder, result_output_folder)
 
     # 1단계: 영상 → 프레임 추출
     print("\n📽️ 프레임 추출 중...")
