@@ -2,66 +2,99 @@ import os
 import json
 import torch
 import numpy as np
-from torch.utils.data import Dataset, DataLoader
 from torchvision import transforms
+from PIL import Image
+from torch.utils.data import Dataset, DataLoader
 from torchvision.models import resnext50_32x4d
 from sklearn.metrics import classification_report, accuracy_score, f1_score
 
-# ✅ PreprocessedDataset 클래스
-class PreprocessedDataset(Dataset):
-    def __init__(self, folder_path, transform=None):
-        self.files = sorted(os.listdir(folder_path))
-        self.folder_path = folder_path
+# ✅ 평가용 데이터셋 정의
+class CustomLabeledDataset(Dataset):
+    def __init__(self, root_dir, folder_to_label_map, transform=None):
         self.transform = transform
+        self.samples = []
+
+        for folder_name, label_idx in folder_to_label_map.items():
+            folder_path = os.path.join(root_dir, folder_name)
+            if not os.path.exists(folder_path): continue
+            for fname in os.listdir(folder_path):
+                if fname.lower().endswith(('.jpg', '.jpeg', '.png')):
+                    self.samples.append((os.path.join(folder_path, fname), label_idx))
 
     def __len__(self):
-        return len(self.files)
+        return len(self.samples)
 
     def __getitem__(self, idx):
-        data = torch.load(os.path.join(self.folder_path, self.files[idx]), weights_only=False)
-        img_tensor = torch.from_numpy(data["img"]).permute(2, 0, 1).float() / 255.0
-        label = data["label"]
+        path, label = self.samples[idx]
+        image = Image.open(path).convert("RGB")
         if self.transform:
-            img_tensor = self.transform(img_tensor)
-        return img_tensor, label
+            image = self.transform(image)
+        return image, label
 
-# ✅ 전처리 정의 (평가 시)
-eval_transform = transforms.Compose([
-    transforms.Normalize(mean=[0.485, 0.456, 0.406],
-                         std=[0.229, 0.224, 0.225])
-])
+# ✅ 메인 평가 함수
+def test_with_classmap(data_root, model_path="resnext_model.pth", class_map_path="class_map.json", batch_size=32):
+    with open(class_map_path, "r", encoding="utf-8") as f:
+        class_map = json.load(f)  # e.g., {"cat": 0, "dog": 1, ...}
 
-# ✅ 클래스 맵 로드
-with open("class_map.json", "r", encoding="utf-8") as f:
-    class_map = json.load(f)
-index_to_class = {v: k for k, v in class_map.items()}
+    # ✅ 여기서 수동 매핑: 평가 폴더명 → 학습 클래스명
+    # 이건 자동으로 유사하게 매핑하거나 수동으로 명확히 지정 필요
+        folder_to_label_map = {
+        "1-1.균열(Crack,CL)": 1,
+        "1-1-2.균열-원주(Crack-Circumferential,CC)": 0,
+        "1-2.표면손상(Surface-Damage,SD)": 2,
+        "1-3.파손(Broken-Pipe,BK)": 3,
+        "1-4.연결관-돌출(Lateral-Protruding,LP)": 4,
+        "1-5.이음부-손상(Joint-Faulty,JF)": 5,
+        "1-6.이음부-단차(Joint-Displaced,JD)": 6,
+        "1-7.토사퇴적(Deposits-Silty,DS)": 7,
+        "1-8.기타결함(Etc.,ETC)": 8,
+        "2-1.이음부(Pipe-Joint,PJ)": 9,
+        "2-2.하수관로_내부(Inside,IN)": 10,
+        "2-3-1.하수관로_외부_맨홀": 11,
+        "2-3-2.하수관로_외부_인버트": 12,
+        "2-3-3.하수관로_외부_자동차": 13
+    }
 
-# ✅ 데이터 로드
-data_dir = "preprocessed_from_folder"
-dataset = PreprocessedDataset(data_dir, transform=eval_transform)
-dataloader = DataLoader(dataset, batch_size=32, shuffle=False)
+    index_to_class = {v: k for k, v in class_map.items()}
 
-# ✅ 모델 로드
-device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
-num_classes = len(class_map)
-model = resnext50_32x4d(weights=None)
-model.fc = torch.nn.Linear(model.fc.in_features, num_classes)
-model.load_state_dict(torch.load("resnext_model_2.pth", map_location=device))
-model.to(device)
-model.eval()
+    transform = transforms.Compose([
+        transforms.Resize(232),
+        transforms.CenterCrop(224),
+        transforms.ToTensor(),
+        transforms.Normalize(mean=[0.485, 0.456, 0.406],
+                             std=[0.229, 0.224, 0.225])
+    ])
 
-# ✅ 평가
-all_preds, all_labels = [], []
-with torch.no_grad():
-    for images, labels in dataloader:
-        images, labels = images.to(device), labels.to(device)
-        outputs = model(images)
-        _, preds = torch.max(outputs, 1)
-        all_preds.extend(preds.cpu().numpy())
-        all_labels.extend(labels.cpu().numpy())
+    dataset = CustomLabeledDataset(data_root, folder_to_label_map, transform=transform)
+    dataloader = DataLoader(dataset, batch_size=batch_size, shuffle=False)
 
-# ✅ 출력
-print("\n🎯 Accuracy:", accuracy_score(all_labels, all_preds))
-print("🎯 Weighted F1:", f1_score(all_labels, all_preds, average="weighted"))
-print("\n📊 Classification Report:")
-print(classification_report(all_labels, all_preds, target_names=[index_to_class[i] for i in sorted(index_to_class)]))
+    device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
+    model = resnext50_32x4d(weights=None)
+    model.fc = torch.nn.Linear(model.fc.in_features, len(class_map))
+    model.load_state_dict(torch.load(model_path, map_location=device))
+    model = model.to(device)
+    model.eval()
+
+    all_preds, all_labels = [], []
+    with torch.no_grad():
+        for images, labels in dataloader:
+            images = images.to(device)
+            outputs = model(images)
+            _, preds = torch.max(outputs, 1)
+            all_preds.extend(preds.cpu().numpy())
+            all_labels.extend(labels.numpy())
+
+    print("🎯 Accuracy:", accuracy_score(all_labels, all_preds))
+    print("🎯 Weighted F1:", f1_score(all_labels, all_preds, average="weighted"))
+    print("📊 Classification Report:")
+    used_class_indices = sorted(set(all_labels + all_preds))  # 실제 등장한 클래스 인덱스만 추출
+    print(classification_report(
+        all_labels,
+        all_preds,
+        labels=used_class_indices,
+        target_names=[index_to_class[i] for i in used_class_indices]
+    ))
+
+# ✅ 실행 예시
+if __name__ == "__main__":
+    test_with_classmap("학습데이터/원천데이터", model_path="resnext_model_2.pth", class_map_path="class_map.json")
