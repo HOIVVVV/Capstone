@@ -38,20 +38,16 @@ model.load_state_dict(checkpoint, strict=False)
 model.to(device)
 model.eval()
 
-# ✅ 전처리 정의
-transform = transforms.Compose([
-    transforms.Resize(232),
-    transforms.CenterCrop(224),
-    transforms.ToTensor(),
-    transforms.Normalize(mean=[0.485, 0.456, 0.406],
-                         std=[0.229, 0.224, 0.225]),
-])
-
 # ✅ 단일 이미지 분석
 def analyze_image(image_path, save_dir):
     image_name = os.path.basename(image_path)
     original = Image.open(image_path).convert("RGB")
-    tensor = transform(original).unsqueeze(0).to(device)
+    original_resized = original.resize((232, 232), resample=Image.BICUBIC)
+    original_cropped = transforms.CenterCrop(224)(original_resized)
+
+    # ✅ 새로운 전처리 적용
+    img_np = np.array(original_cropped).astype(np.float32) / 255.0
+    tensor = torch.from_numpy(img_np).permute(2, 0, 1).unsqueeze(0).to(device)
 
     with torch.no_grad():
         output = model(tensor)
@@ -74,9 +70,9 @@ def analyze_image(image_path, save_dir):
 
     cam = np.maximum(cam, 0)
     cam = cam / np.max(cam)
-    cam_resized = cv2.resize(cam, original.size)
+    cam_resized = cv2.resize(cam, original_cropped.size)
     heatmap = cv2.applyColorMap(np.uint8(255 * cam_resized), cv2.COLORMAP_JET)
-    overlay = np.array(original) / 255.0 + heatmap / 255.0
+    overlay = np.array(original_cropped) / 255.0 + heatmap / 255.0
     overlay = np.uint8(255 * (overlay / np.max(overlay)))
 
     # ✅ Grad-CAM 저장
@@ -93,6 +89,7 @@ def analyze_image(image_path, save_dir):
     else:
         print(f"❌ Grad-CAM 저장 실패: {gradcam_save_path}")
 
+
 # ✅ 폴더 내 모든 이미지 분석
 def analyze_folder(image_dir, save_dir):
     valid_exts = (".png", ".jpg", ".jpeg")
@@ -103,6 +100,21 @@ def analyze_folder(image_dir, save_dir):
     os.makedirs(save_dir, exist_ok=True)
     for file in sorted(files):
         analyze_image(os.path.join(image_dir, file), save_dir)
+        
+def preprocess_input_image(image_path):
+    image = Image.open(image_path).convert("RGB")
+    image = image.resize((232, 232), resample=Image.BICUBIC)
+    image = transforms.CenterCrop(224)(image)
+
+    img_np = np.array(image).astype(np.float32) / 255.0
+    img_tensor = torch.from_numpy(img_np).permute(2, 0, 1)
+
+    # ✅ Normalize 적용 (학습과 동일)
+    normalize = transforms.Normalize(mean=[0.485, 0.456, 0.406],
+                                     std=[0.229, 0.224, 0.225])
+    img_tensor = normalize(img_tensor)
+
+    return img_tensor.unsqueeze(0)  # [1, C, H, W]
 
 # ✅ 실행
 if __name__ == "__main__":

@@ -102,12 +102,11 @@ class PreprocessedDataset(Dataset):
         img_array = data["img"]
         if isinstance(img_array, str):
             raise TypeError("img should be a numpy array, not str. Check preprocessing step.")
-        img_tensor = torch.from_numpy(img_array).permute(2, 0, 1).float() / 255.0
+        img_tensor = torch.from_numpy(img_array).permute(2, 0, 1).float()  # ✅ 이미 정규화된 float32
         label = data["label"]
         if self.transform:
             img_tensor = self.transform(img_tensor)
         return img_tensor, label
-
 
 def get_unique_model_path(base_name="resnext_model", extension=".pth"):
     i = 0
@@ -130,14 +129,10 @@ def main():
     ])
 
     train_transform = transforms.Compose([
-        transforms.Resize(232),
-        transforms.CenterCrop(224),
-        transforms.RandomHorizontalFlip(),
-        transforms.Normalize(mean=[0.485, 0.456, 0.406], std=[0.229, 0.224, 0.225])
+    transforms.RandomHorizontalFlip()
     ])
 
     val_transform = transforms.Compose([
-        transforms.Normalize(mean=[0.485, 0.456, 0.406], std=[0.229, 0.224, 0.225])
     ])
 
     dataset_root = "학습데이터/원천데이터"
@@ -152,9 +147,10 @@ def main():
     else:
         for i, (img_path, label, label_name) in enumerate(dataset.items):
             pt_path = os.path.join(preprocessed_dir, f"img_{i}.pt")
-            image = Image.open(img_path).convert("RGB").resize((224, 224))  # 🔧 크기 고정
-            img_np = np.array(image).astype(np.uint8)  # 🧠 저장 최적화
+            image = Image.open(img_path).convert("RGB").resize((232, 232), resample=Image.BICUBIC)  # 🔧 크기 고정
+            img_np = np.array(image).astype(np.float32) / 255.0              # ✅ float32 저장 + 정규화
             torch.save({"img": img_np, "label": label, "class_name": label_name, "path": img_path}, pt_path)
+
 
     files = sorted(os.listdir(preprocessed_dir))
 
