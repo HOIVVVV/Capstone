@@ -129,7 +129,10 @@ def main():
     ])
 
     train_transform = transforms.Compose([
-    transforms.RandomHorizontalFlip()
+    transforms.RandomHorizontalFlip(p=0.5),                # 좌우 반전 (대부분의 이미지에서 기본)
+    transforms.RandomRotation(degrees=15),                 # 가벼운 회전 (회전 민감하지 않다면)
+    transforms.ColorJitter(brightness=0.1, contrast=0.1, saturation=0.1),  # 색상 변화
+    transforms.RandomErasing(p=0.1, scale=(0.02, 0.1)),    # 작은 영역 삭제 (강력한 regularization)
     ])
 
     val_transform = transforms.Compose([
