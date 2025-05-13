@@ -189,14 +189,22 @@ def analyze_images_in_folder(folder_path, result_output_folder, frame_output_fol
             print(f"🧹 프레임 폴더 삭제 완료: {frame_output_folder}")
         except Exception as e:
             print(f"⚠️ 프레임 폴더 삭제 중 오류 발생: {e}")
-        return False
+        return {
+            'success': False,
+            'district': None,
+            'date': None
+        }
 
     if most_common_district == "지역 추출 실패":
         print("⚠️ 지역 정보가 없습니다. 수동으로 입력해 주세요.")
     if most_common_date == "날짜 추출 안됨":
         print("⚠️ 날짜 정보가 없습니다. 수동으로 입력해 주세요.")
 
-    return True
+    return {
+    'success': True,
+    'district': most_common_district,
+    'date': most_common_date
+    }
 
 if __name__ == "__main__":
     folder = input("📂 분석할 이미지 폴더 경로 입력: ").strip()

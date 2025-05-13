@@ -8,6 +8,7 @@ from frame_extractor import extract_frames, extract_key_frames_for_text
 from BackEnd.PushImageToModel import predict_images_in_folder
 from BackEnd.GetTextFromImage import analyze_images_in_folder
 from PIL import Image
+from db.insert_to_db import insert_analysis_results
 
 def analyze_video(video_path):
     if not os.path.isfile(video_path):
@@ -34,15 +35,16 @@ def analyze_video(video_path):
     if not text_frame_paths:
         print("❌ 프레임 추출 실패")
         return
-
-    found_seoul = False
-    all_text = []
     
-    # OCR 기반 날짜/지역 분석
-    result = analyze_images_in_folder(frame_output_path, result_output_path, frame_output_path)
+    ocr_result = analyze_images_in_folder(frame_output_path, result_output_path, frame_output_path)
+    print(ocr_result)
 
-    if not result:
-        return  # 비서울이면 종료
+    if not ocr_result or not ocr_result.get('success'):
+        print("종료")
+        return  # 실패 시 종료
+
+    district = ocr_result.get('district')
+    recorded_date = ocr_result.get('date')
 
     # ⬇️ 다음 단계로 이동
     print("📌 서울 지역으로 판단되어 분석을 계속 진행합니다.")
@@ -62,6 +64,14 @@ def analyze_video(video_path):
         print(f"🧹 프레임 폴더 삭제 완료: {frame_output_folder}")
     except Exception as e:
         print(f"⚠️ 프레임 폴더 삭제 중 오류 발생: {e}")
+    
+    #DB 삽입    
+    insert_analysis_results(
+        video_path=video_path,
+        result_dir=result_output_folder,
+        district=district,
+        recorded_date=recorded_date
+    )
 
     print(f"\n✅ 분석 완료! 결과 저장 위치: {os.path.abspath(result_output_folder)}")
     
