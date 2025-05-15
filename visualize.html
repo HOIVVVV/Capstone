@@ -7,25 +7,14 @@
             const chartType = document.querySelector("select[name='chart_type']").value;
             const defaultFilters = document.getElementById("default-filters");
             const lineOptionSelector = document.getElementById("line-option-selector");
-            const mapOptionSelector = document.getElementById("map-option-selector");
-            const mapContainer = document.getElementById("map-container");
 
 
             if (chartType === 'line') {
                 defaultFilters.style.display = 'none';
-                lineOptionSelector.style.display = 'block';
-                mapOptionSelector.style.display = 'none';
-                mapContainer.style.display = 'none';
-            } else if (chartType === 'map') {
-                defaultFilters.style.display = 'none';
-                lineOptionSelector.style.display = 'none';
-                mapOptionSelector.style.display = 'block';
-                mapContainer.style.display = 'block';
+                lineOptionSelector.style.display = 'flex';
             } else {
-                defaultFilters.style.display = 'block';
+                defaultFilters.style.display = 'flex';
                 lineOptionSelector.style.display = 'none';
-                mapOptionSelector.style.display = 'none';
-                mapContainer.style.display = 'none';
             }
         }
 
@@ -64,58 +53,61 @@
             {% endif %}
         </div>
 
-        <!-- ✅ line 차트 전용 옵션 -->
-        <div id="line-option-selector" style="display:none;">
+
+
+        <!-- ✅ 필터 전체를 감싸는 부모 컨테이너 -->
+        <div id = "line-option-selector" style="gap: 20px; margin-top: 20px;">
             <label>집계 단위:</label>
             <select name="aggregate_unit">
                 <option value="month">월별</option>
                 <option value="quarter">분기별</option>
             </select><br><br>
+            <!-- 손상 유형 필터 -->
+            <div id="damage-filter" style="width: 150px; height: 500px; border: 1px solid #ccc; overflow: auto; padding: 10px;">
+                <label><strong>손상 유형</strong></label><br>
 
+                <!-- ✅ 개별 손상 유형 체크박스 -->
+                {% for dtype in damage_types %}
+                    <div>
+                        <input type="checkbox" class="damage-type-checkbox" name="damage_type" value="{{ dtype }}"> {{ dtype }}
+                    </div>
+                {% endfor %}
+            </div>
 
-            <label>손상 유형</label><br>
-            {% for dtype in damage_types %}
-                <input type="checkbox" name="damage_type" value="{{ dtype }}">{{ dtype }}<br>
-            {% endfor %}
-
-            <label>촬영 위치</label><br>
-            {% for loc in locations %}
-                <input type="checkbox" name="location" value="{{ loc }}">{{ loc }}<br>
-            {% endfor %}
+            <!-- 촬영 위치 필터 -->
+            <div id="location-filter" style="width: 150px; height: 500px; border: 1px solid #ccc; overflow: auto; padding: 10px;">
+                <label><strong>촬영 위치</strong></label><br>
+                {% for loc in locations %}
+                    <div>
+                        <input type="checkbox" name="location" value="{{ loc }}"> {{ loc }}
+                    </div>
+                {% endfor %}
+            </div>
         </div>
+        <!-- ✅ 필터 전체를 감싸는 부모 컨테이너 -->
+        <div id = "default-filters" style="gap: 20px; margin-top: 20px;">
+            <!-- 손상 유형 필터 -->
+            <div id="damage-filter" style="width: 150px; height: 500px; border: 1px solid #ccc; overflow: auto; padding: 10px;">
+                <label><strong>손상 유형</strong></label><br>
 
-        <!-- ✅ map 차트 전용 옵션 -->
-        <div id="map-option-selector" style="display:none;">
-            <label>손상 유형</label><br>
-            {% for dtype in damage_types %}
-                <input type="checkbox" name="damage_type" value="{{ dtype }}">{{ dtype }}<br>
-            {% endfor %}
+                <!-- ✅ 개별 손상 유형 체크박스 -->
+                {% for dtype in damage_types %}
+                    <div>
+                        <input type="checkbox" class="damage-type-checkbox" name="damage_type" value="{{ dtype }}"> {{ dtype }}
+                    </div>
+                {% endfor %}
+            </div>
 
-            <label>촬영 위치</label><br>
-            {% for loc in locations %}
-                <input type="checkbox" name="location" value="{{ loc }}">{{ loc }}<br>
-            {% endfor %}
+            <!-- 촬영 위치 필터 -->
+            <div id="location-filter" style="width: 150px; height: 500px; border: 1px solid #ccc; overflow: auto; padding: 10px;">
+                <label><strong>촬영 위치</strong></label><br>
+                {% for loc in locations %}
+                    <div>
+                        <input type="checkbox" name="location" value="{{ loc }}"> {{ loc }}
+                    </div>
+                {% endfor %}
+            </div>
         </div>
-
-        <!-- ✅ 기본 필터 (bar, pie, heatmap, stacked용) -->
-        <div id="default-filters">
-            <label>손상 유형</label><br>
-            {% for dtype in damage_types %}
-                <input type="checkbox" name="damage_type" value="{{ dtype }}">{{ dtype }}<br>
-            {% endfor %}
-
-            <label>촬영 위치</label><br>
-            {% for loc in locations %}
-                <input type="checkbox" name="location" value="{{ loc }}">{{ loc }}<br>
-            {% endfor %}
-        </div>
-
-
-            <!-- ✅ 지도 시각화 영역 -->
-    <div id="map-container" style="display: none;">
-        <h2>지도 시각화</h2>
-        {{ map_html|safe }}
-    </div>
     </form>
 </body>
 </html>
