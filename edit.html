@@ -9,10 +9,14 @@
   <link rel="stylesheet" href="https://stackpath.bootstrapcdn.com/bootstrap/4.5.2/css/bootstrap.min.css">
   <script src="https://kit.fontawesome.com/a076d05399.js" crossorigin="anonymous"></script>
 
+  <!-- Google Fonts -->
+  <link href="https://fonts.googleapis.com/css2?family=Noto+Sans+KR&display=swap" rel="stylesheet">
+
   <style>
     html, body {
       height: 100%;
       font-family: 'Noto Sans KR', sans-serif;
+      background-color: #f8f9fa;
     }
     #wrapper {
       display: flex;
@@ -27,15 +31,50 @@
     .sidebar .list-group-item {
       background-color: #dc3545;
       border: none;
+      color: white;
     }
     .sidebar .list-group-item:hover {
-      background-color: #c82333;
+      background-color: #dc3545;
     }
     .navbar input[type="search"] {
       width: 320px;
     }
     .table td, .table th {
       font-size: 14px;
+    }
+    .card {
+      background-color: white;
+      border-radius: 8px;
+      box-shadow: 0 2px 4px rgba(0,0,0,0.1);
+      padding: 15px;
+      margin-bottom: 20px;
+    }
+    .form-control, .btn {
+      border-radius: 4px;
+    }
+    .form-group label {
+      font-weight: 600;
+    }
+    #chart-result {
+      height: 500px;
+      width: 70%;
+      border: 1px solid #dee2e6;
+      border-radius: 8px;
+      background-color: white;
+      padding: 15px;
+      overflow: auto;
+    }
+    #damage-filter, #location-filter {
+      width: 150px;
+      height: 300px;
+      border: 1px solid #dee2e6;
+      border-radius: 8px;
+      background-color: white;
+      padding: 10px;
+      overflow: auto;
+    }
+    #damage-filter {
+      margin-right: 20px;
     }
   </style>
 
@@ -60,11 +99,11 @@
     <div class="sidebar">
       <div class="sidebar-heading px-3 pt-4 font-weight-bold">하수관로 관리 시스템</div>
       <div class="list-group list-group-flush">
-        <a href="#" class="list-group-item text-white"><i class="fas fa-tachometer-alt mr-2"></i> 대시보드</a>
-        <a href="#" class="list-group-item text-white"><i class="fas fa-search mr-2"></i> 관로 점검 결과</a>
-        <a href="#" class="list-group-item text-white"><i class="fas fa-chart-pie mr-2"></i> 손상 통계</a>
-        <a href="#" class="list-group-item text-white"><i class="fas fa-book mr-2"></i> 손상도 매핑</a>
-        <a href="#" class="list-group-item text-white"><i class="fas fa-chart-bar mr-2"></i> 손상 분석</a>
+        <a href="#" class="list-group-item"><i class="fas fa-tachometer-alt mr-2"></i> 대시보드</a>
+        <a href="#" class="list-group-item"><i class="fas fa-search mr-2"></i> 관로 점검 결과</a>
+        <a href="#" class="list-group-item"><i class="fas fa-chart-pie mr-2"></i> 손상 통계</a>
+        <a href="#" class="list-group-item"><i class="fas fa-book mr-2"></i> 손상도 매핑</a>
+        <a href="#" class="list-group-item"><i class="fas fa-chart-bar mr-2"></i> 손상 분석</a>
       </div>
     </div>
 
@@ -109,19 +148,19 @@
             </select>
           </div>
 
-          <!-- 차트 결과 먼저 -->
-          <div id="chart-result" class="mb-4" style="height: 500px; border: 1px solid #ccc; overflow: auto;">
+          <!-- 차트 결과 -->
+          <div id="chart-result" class="mb-4">
             {% if chart_html %}
               {{ chart_html|safe }}
             {% else %}
-              <p style="text-align: center; line-height: 500px; color: #999;">그래프가 여기에 표시됩니다.</p>
+              <p style="text-align: center; line-height: 470px; color: #999;">그래프가 여기에 표시됩니다.</p>
             {% endif %}
           </div>
 
           <!-- 필터 나란히 -->
           <div class="d-flex">
             <!-- 손상 유형 -->
-            <div id="damage-filter" style="width: 150px; height: 300px; border: 1px solid #ccc; overflow: auto; padding: 10px; margin-right: 20px;">
+            <div id="damage-filter">
               <label><strong>손상 유형</strong></label><br>
               {% for dtype in damage_types %}
                 <div>
@@ -132,7 +171,7 @@
             </div>
 
             <!-- 촬영 위치 -->
-            <div id="location-filter" style="width: 150px; height: 300px; border: 1px solid #ccc; overflow: auto; padding: 10px;">
+            <div id="location-filter">
               <label><strong>촬영 위치</strong></label><br>
               {% for loc in locations %}
                 <div>
