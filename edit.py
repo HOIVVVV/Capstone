@@ -89,8 +89,13 @@ def generate_chart():
     df = pd.DataFrame(data)
     
     # ✅ 전체 선택 옵션 제공을 위해 전체 리스트도 다시 전달
-    damage_types = df['damage_type'].unique().tolist()
-    locations = df['location'].unique().tolist()
+    # damage_types = df['damage_type'].unique().tolist()
+    # locations = df['location'].unique().tolist()
+    # ✅ 전체 손상 유형과 위치 가져오기
+    all_damage_types = db.session.query(DamageImage.damage_type).distinct().all()
+    all_locations = db.session.query(Video.location).distinct().all()
+    damage_types = [d[0] for d in all_damage_types]
+    locations = [l[0] for l in all_locations]
     min_date = df['recorded_date'].min().strftime('%Y-%m-%d')
     max_date = df['recorded_date'].max().strftime('%Y-%m-%d')
 
@@ -125,7 +130,8 @@ def generate_chart():
                            damage_types=damage_types,   # 전체 리스트
                            locations=locations,         # 전체 리스트
                            min_date=min_date,
-                           max_date=max_date)
+                           max_date=max_date,
+                           chart_type = chart_type)
 
     elif chart_type == 'bar':
         has_locations = bool(selected_locations)
@@ -143,7 +149,16 @@ def generate_chart():
         else:
             return '위치 또는 손상 유형 중 하나 이상 선택해주세요.'
         chart_html =  fig.to_html(full_html=False)
-        return render_template("edit.html", chart_html=chart_html)
+        return render_template("edit.html", chart_html=chart_html,
+                           start_date=start_date,
+                           end_date=end_date,
+                           selected_damage_types=selected_damage_types,
+                           selected_locations=selected_locations,
+                           damage_types=damage_types,   # 전체 리스트
+                           locations=locations,         # 전체 리스트
+                           min_date=min_date,
+                           max_date=max_date,
+                           chart_type = chart_type)
 
     elif chart_type == 'pie':
         has_locations = bool(selected_locations)
@@ -152,19 +167,19 @@ def generate_chart():
         if has_locations and has_damage_types:
             # ✅ 위치별 손상유형 비율 pie 여러 개
             summary = df.groupby(['location', 'damage_type']).size().reset_index(name='count')
-            locations = summary['location'].unique()
+            pie_locations = summary['location'].unique()
 
-            num_charts = len(locations)
+            num_charts = len(pie_locations)
             cols = 5  # 한 줄에 최대 5개
             rows = (num_charts + cols - 1) // cols
 
             fig = make_subplots(
                 rows=rows, cols=cols,
                 specs=[[{'type': 'domain'} for _ in range(cols)] for _ in range(rows)],
-                subplot_titles=[f"{loc} 손상 유형 분포" for loc in locations]
+                subplot_titles=[f"{loc} 손상 유형 분포" for loc in pie_locations]
             )
 
-            for i, loc in enumerate(locations):
+            for i, loc in enumerate(pie_locations):
                 row = i // cols + 1
                 col = i % cols + 1
                 data = summary[summary['location'] == loc]
@@ -186,11 +201,29 @@ def generate_chart():
             fig = px.pie(summary, values='count', names='damage_type', title='손상 유형 분포', hole=0.3)
 
         else:
-            return render_template("edit.html", chart_html="<p style='text-align:center;'>위치 또는 손상 유형 중 하나 이상 선택해주세요.</p>")
+            return render_template("edit.html", chart_html="<p style='text-align:center;'>위치 또는 손상 유형 중 하나 이상 선택해주세요.</p>",
+                           start_date=start_date,
+                           end_date=end_date,
+                           selected_damage_types=selected_damage_types,
+                           selected_locations=selected_locations,
+                           damage_types=damage_types,   # 전체 리스트
+                           locations=locations,         # 전체 리스트
+                           min_date=min_date,
+                           max_date=max_date,
+                           chart_type = chart_type)
 
         # ✅ HTML로 변환하여 템플릿에 전달
         chart_html = fig.to_html(full_html=False)
-        return render_template("edit.html", chart_html=chart_html)
+        return render_template("edit.html", chart_html=chart_html,
+                           start_date=start_date,
+                           end_date=end_date,
+                           selected_damage_types=selected_damage_types,
+                           selected_locations=selected_locations,
+                           damage_types=damage_types,   # 전체 리스트
+                           locations=locations,         # 전체 리스트
+                           min_date=min_date,
+                           max_date=max_date,
+                           chart_type = chart_type)
 
     elif chart_type == 'heatmap':
         pivot = df.groupby(['location', 'damage_type']).size().unstack(fill_value=0)
@@ -201,7 +234,16 @@ def generate_chart():
         if selected_damage_types:
             cols = pivot.columns.intersection(selected_damage_types)
             if cols.empty:
-                return render_template("edit.html", chart_html="<p style='text-align:center;'>선택한 손상 유형에 해당하는 데이터가 없습니다.</p>")
+                return render_template("edit.html", chart_html="<p style='text-align:center;'>선택한 손상 유형에 해당하는 데이터가 없습니다.</p>",
+                           start_date=start_date,
+                           end_date=end_date,
+                           selected_damage_types=selected_damage_types,
+                           selected_locations=selected_locations,
+                           damage_types=damage_types,   # 전체 리스트
+                           locations=locations,         # 전체 리스트
+                           min_date=min_date,
+                           max_date=max_date,
+                           chart_type = chart_type)
             pivot = pivot[cols]
 
         fig = go.Figure(data=go.Heatmap(
@@ -216,7 +258,16 @@ def generate_chart():
         fig.update_layout(title='위치별 손상유형 히트맵', xaxis_title="손상 유형", yaxis_title="위치")
 
         chart_html = fig.to_html(full_html=False)
-        return render_template("edit.html", chart_html=chart_html)
+        return render_template("edit.html", chart_html=chart_html,
+                           start_date=start_date,
+                           end_date=end_date,
+                           selected_damage_types=selected_damage_types,
+                           selected_locations=selected_locations,
+                           damage_types=damage_types,   # 전체 리스트
+                           locations=locations,         # 전체 리스트
+                           min_date=min_date,
+                           max_date=max_date,
+                           chart_type = chart_type)
         
     elif chart_type == 'stacked':
         pivot = df.groupby(['location', 'damage_type']).size().unstack(fill_value=0)
@@ -227,7 +278,16 @@ def generate_chart():
         if selected_damage_types:
             cols = pivot.columns.intersection(selected_damage_types)
             if cols.empty:
-                return render_template("edit.html", chart_html="<p style='text-align:center;'>선택한 손상 유형에 해당하는 데이터가 없습니다.</p>")
+                return render_template("edit.html", chart_html="<p style='text-align:center;'>선택한 손상 유형에 해당하는 데이터가 없습니다.</p>",
+                           start_date=start_date,
+                           end_date=end_date,
+                           selected_damage_types=selected_damage_types,
+                           selected_locations=selected_locations,
+                           damage_types=damage_types,   # 전체 리스트
+                           locations=locations,         # 전체 리스트
+                           min_date=min_date,
+                           max_date=max_date,
+                           chart_type = chart_type)
             pivot = pivot[cols]
 
         fig = go.Figure()
@@ -247,7 +307,16 @@ def generate_chart():
         )
 
         chart_html = fig.to_html(full_html=False)
-        return render_template("edit.html", chart_html=chart_html)
+        return render_template("edit.html", chart_html=chart_html,
+                           start_date=start_date,
+                           end_date=end_date,
+                           selected_damage_types=selected_damage_types,
+                           selected_locations=selected_locations,
+                           damage_types=damage_types,   # 전체 리스트
+                           locations=locations,         # 전체 리스트
+                           min_date=min_date,
+                           max_date=max_date,
+                           chart_type = chart_type)
     
     elif chart_type == 'map':
         # ✅ 사용자 선택 정보 가져오기
@@ -340,7 +409,16 @@ def generate_chart():
 
         
         chart_html = m._repr_html_()
-        return render_template("edit.html", chart_html=chart_html)
+        return render_template("edit.html", chart_html=chart_html,
+                           start_date=start_date,
+                           end_date=end_date,
+                           selected_damage_types=selected_damage_types,
+                           selected_locations=selected_locations,
+                           damage_types=damage_types,   # 전체 리스트
+                           locations=locations,         # 전체 리스트
+                           min_date=min_date,
+                           max_date=max_date,
+                           chart_type = chart_type)
 
     else:
         return '그래프 종류를 선택해주세요.'
@@ -350,6 +428,11 @@ def generate_chart():
     plt.savefig(img, format='png')
     img.seek(0)
     return send_file(img, mimetype='image/png')
+
+
+@app.route('/front')
+def front_page():
+    return render_template('front.html')
 
 
 
