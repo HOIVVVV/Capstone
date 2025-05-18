@@ -30,7 +30,7 @@ app.config['SQLALCHEMY_TRACK_MODIFICATIONS'] = False
 db = SQLAlchemy(app)
 
 #경로설정
-path = "upload.html"
+path = "edit.html"
 
 class DamageImage(db.Model):
     __tablename__ = 'damage_images'
