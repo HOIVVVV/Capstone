@@ -1,94 +1,116 @@
 import os
 import json
 import torch
+import cv2
 import numpy as np
-from torchvision import transforms
-from PIL import Image
+import torchvision.transforms.v2 as transforms_v2  # PyTorch >=2.0
 from torch.utils.data import Dataset, DataLoader
 from torchvision.models import resnext50_32x4d
+from torchvision import transforms
 from sklearn.metrics import classification_report, accuracy_score, f1_score
+from PIL import Image
 
-# ✅ 평가용 데이터셋 정의
-class CustomLabeledDataset(Dataset):
-    def __init__(self, root_dir, folder_to_label_map, transform=None):
-        self.transform = transform
+# ✅ 이미지 폴더에서 직접 불러오는 평가 Dataset
+class ImageDatasetWithLabelMap(Dataset):
+    def __init__(self, data_root, class_map_path, transform=None):
+        with open(class_map_path, "r", encoding="utf-8") as f:
+            class_map = json.load(f)
+        self.label_map = {k: int(v) for k, v in class_map.items()}
+
         self.samples = []
+        for class_name, label in self.label_map.items():
+            folder = os.path.join(data_root, class_name)
+            if not os.path.isdir(folder): continue
+            for fname in os.listdir(folder):
+                if fname.lower().endswith((".jpg", ".jpeg", ".png")):
+                    self.samples.append((os.path.join(folder, fname), label))
 
-        for folder_name, label_idx in folder_to_label_map.items():
-            folder_path = os.path.join(root_dir, folder_name)
-            if not os.path.exists(folder_path): continue
-            for fname in os.listdir(folder_path):
-                if fname.lower().endswith(('.jpg', '.jpeg', '.png')):
-                    self.samples.append((os.path.join(folder_path, fname), label_idx))
+        self.transform = transform
 
     def __len__(self):
         return len(self.samples)
 
     def __getitem__(self, idx):
-        path, label = self.samples[idx]
-        image = Image.open(path).convert("RGB")
+        img_path, label = self.samples[idx]
+        image = Image.open(img_path).convert("RGB")
         if self.transform:
             image = self.transform(image)
         return image, label
 
-# ✅ 메인 평가 함수
-def test_with_classmap(data_root, model_path="resnext_model.pth", class_map_path="class_map.json", batch_size=32):
+def apply_clahe(pil_img):
+    img = np.array(pil_img.convert("L"))  # Grayscale
+    clahe = cv2.createCLAHE(clipLimit=2.0, tileGridSize=(8,8))
+    cl_img = clahe.apply(img)
+    return Image.fromarray(cl_img).convert("RGB")
+
+def stretch_histogram(img):
+    img_np = np.asarray(img)
+    img_min = img_np.min()
+    img_max = img_np.max()
+    stretched = ((img_np - img_min) / (img_max - img_min + 1e-5) * 255.0).astype(np.uint8)
+    return Image.fromarray(stretched)
+
+# ✅ 평가 함수
+def test_with_images(data_root, model_path="resnext_model.pth", class_map_path="class_map.json", batch_size=32):
     with open(class_map_path, "r", encoding="utf-8") as f:
-        class_map = json.load(f)  # e.g., {"cat": 0, "dog": 1, ...}
+        class_map = json.load(f)
+    index_to_class = {int(v): k for k, v in class_map.items()}
 
-    # ✅ 여기서 수동 매핑: 평가 폴더명 → 학습 클래스명
-    # 이건 자동으로 유사하게 매핑하거나 수동으로 명확히 지정 필요
-        folder_to_label_map = {
-        "1-1-1.균열-길이(Crack-Longitudinal,CL)": 1,
-        "1-1-2.균열-원주(Crack-Circumferential,CC)": 0,
-        "1-2.표면손상(Surface-Damage,SD)": 2,
-        "1-3.파손(Broken-Pipe,BK)": 3,
-        "1-4.연결관-돌출(Lateral-Protruding,LP)": 4,
-        "1-5.이음부-손상(Joint-Faulty,JF)": 5,
-        "2-1.이음부(Pipe-Joint,PJ)_1": 9,
-        "2-2.하수관로_내부(Inside,IN)_1": 10
-    }
-
-    index_to_class = {v: k for k, v in class_map.items()}
-
-    transform = transforms.Compose([
-        transforms.Resize(232),
-        transforms.CenterCrop(224),
-        transforms.ToTensor(),
-        transforms.Normalize(mean=[0.485, 0.456, 0.406],
-                             std=[0.229, 0.224, 0.225])
+    # ✅ 학습과 동일한 전처리
+    transform = transforms_v2.Compose([
+        transforms.Lambda(apply_clahe),
+        transforms.Lambda(stretch_histogram),
+        transforms.Resize(256),                            # ✅ 충분히 크게 리사이즈 (선택)
+        transforms.CenterCrop(224),                        # ✅ 중앙 자르기
+        transforms.ToTensor(),  # PIL → tensor (C, H, W), [0,1]
+        # 학습 시 Normalize 안 했으면 아래 생략
+        transforms_v2.Normalize(mean=[0.485, 0.456, 0.406],
+                            std=[0.229, 0.224, 0.225])
     ])
 
-    dataset = CustomLabeledDataset(data_root, folder_to_label_map, transform=transform)
+    dataset = ImageDatasetWithLabelMap(data_root, class_map_path, transform=transform)
     dataloader = DataLoader(dataset, batch_size=batch_size, shuffle=False)
 
     device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
     model = resnext50_32x4d(weights=None)
     model.fc = torch.nn.Linear(model.fc.in_features, len(class_map))
-    model.load_state_dict(torch.load(model_path, map_location=device))
-    model = model.to(device)
+    model.load_state_dict(torch.load(model_path, map_location=device, weights_only=False))
+    model.to(device)
     model.eval()
 
+    total = len(dataset)
     all_preds, all_labels = [], []
+
+    print(f"\n🚀 총 {total}개 이미지 평가 시작...\n")
+
     with torch.no_grad():
-        for images, labels in dataloader:
+        for i, (images, labels) in enumerate(dataloader):
             images = images.to(device)
             outputs = model(images)
             _, preds = torch.max(outputs, 1)
             all_preds.extend(preds.cpu().numpy())
             all_labels.extend(labels.numpy())
 
+            done = min((i + 1) * batch_size, total)
+            percent = (done / total) * 100
+            print(f"🔁 진행도: [{done}/{total}]  ({percent:.1f}%)", end="\r")
+
+    print("\n✅ 평가 완료!\n")
     print("🎯 Accuracy:", accuracy_score(all_labels, all_preds))
     print("🎯 Weighted F1:", f1_score(all_labels, all_preds, average="weighted"))
     print("📊 Classification Report:")
-    used_class_indices = sorted(set(all_labels + all_preds))  # 실제 등장한 클래스 인덱스만 추출
+    used_indices = sorted(set(all_labels + all_preds))
+    target_names = [index_to_class.get(i, f"Unknown({i})") for i in used_indices]
     print(classification_report(
-        all_labels,
-        all_preds,
-        labels=used_class_indices,
-        target_names=[index_to_class[i] for i in used_class_indices]
+        all_labels, all_preds,
+        labels=used_indices,
+        target_names=target_names
     ))
 
 # ✅ 실행 예시
 if __name__ == "__main__":
-    test_with_classmap("원천데이터", model_path="resnext_model_2.pth", class_map_path="class_map.json")
+    test_with_images(
+        data_root="학습데이터/원천데이터",  # ← 클래스별 폴더 구조로 되어 있어야 함
+        model_path="resnext_model_5.pth",
+        class_map_path="class_map.json"
+    )

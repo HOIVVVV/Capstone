@@ -13,6 +13,12 @@ def index():
 def hello():
     return "hello"
 
+
+@main.route('/dashboard')
+def dashboard():
+    return render_template('index.html')
+
+
 @main.route('/upload', methods=['POST'])
 def upload_video():
     file = request.files['video']

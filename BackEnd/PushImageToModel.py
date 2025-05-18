@@ -3,8 +3,9 @@ import json
 import torch
 import cv2
 import numpy as np
-from PIL import Image
+import torchvision.transforms.v2 as transforms_v2  # PyTorch >=2.0
 import torchvision.transforms as transforms
+from PIL import Image
 from torchvision.models import resnext50_32x4d, ResNeXt50_32X4D_Weights
 from Grad_cam import GradCAM
 
@@ -12,7 +13,7 @@ from Grad_cam import GradCAM
 def load_class_map(path):
     with open(path, "r", encoding="utf-8") as f:
         raw_map = json.load(f)
-    return {int(v): k for k, v in raw_map.items()}  # index -> label
+    return {int(v): k for k, v in raw_map.items()}
 
 # ✅ 모델 및 클래스 맵 초기화
 device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
@@ -20,23 +21,39 @@ device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
 weights = ResNeXt50_32X4D_Weights.DEFAULT
 model = resnext50_32x4d(weights=weights)
 
-class_map = load_class_map("class_map.json")  # 14개 클래스
+class_map = load_class_map("class_map.json")
 num_classes = max(class_map.keys()) + 1
 model.fc = torch.nn.Linear(model.fc.in_features, num_classes)
 
-checkpoint = torch.load("resnext_model_2.pth", map_location=device)
+checkpoint = torch.load("resnext_model.pth", map_location=device)
 model.load_state_dict(checkpoint, strict=False)
 model.to(device)
 model.eval()
 
-# ✅ 전처리
-transform = transforms.Compose([
-    transforms.Resize(232),
-    transforms.CenterCrop(224),
-    transforms.ToTensor(),
-    transforms.Normalize(mean=[0.485, 0.456, 0.406],
-                         std=[0.229, 0.224, 0.225]),
-])
+def apply_clahe(pil_img):
+    img = np.array(pil_img.convert("L"))  # Grayscale
+    clahe = cv2.createCLAHE(clipLimit=2.0, tileGridSize=(8,8))
+    cl_img = clahe.apply(img)
+    return Image.fromarray(cl_img).convert("RGB")
+
+def stretch_histogram(img):
+    img_np = np.asarray(img)
+    img_min = img_np.min()
+    img_max = img_np.max()
+    stretched = ((img_np - img_min) / (img_max - img_min + 1e-5) * 255.0).astype(np.uint8)
+    return Image.fromarray(stretched)
+
+# ✅ 학습과 동일한 transform 적용 (ToTensor, Normalize 없음)
+transform = transforms_v2.Compose([
+        transforms.Lambda(apply_clahe),
+        transforms.Lambda(stretch_histogram),
+        transforms.Resize(256),                            # ✅ 충분히 크게 리사이즈 (선택)
+        transforms.CenterCrop(224),                        # ✅ 중앙 자르기
+        transforms.ToTensor(),  # PIL → tensor (C, H, W), [0,1]
+        # 학습 시 Normalize 안 했으면 아래 생략
+        transforms_v2.Normalize(mean=[0.485, 0.456, 0.406],
+                            std=[0.229, 0.224, 0.225])
+    ])
 
 def predict_images_in_folder(folder_path, save_base_path):
     for idx, filename in enumerate(sorted(os.listdir(folder_path))):
@@ -50,6 +67,8 @@ def predict_images_in_folder(folder_path, save_base_path):
 def predict_image(image_path, save_path, video_title, frame_number):
     original_image = Image.open(image_path).convert("RGB")
     original_width, original_height = original_image.size
+
+    # ✅ transform 사용
     image_tensor = transform(original_image).unsqueeze(0).to(device)
 
     with torch.no_grad():
@@ -61,7 +80,6 @@ def predict_image(image_path, save_path, video_title, frame_number):
     top3_labels = [class_map.get(idx, f"Unknown({idx})") for idx in top3_indices]
     top3_probs_vals = top3_probs[0].tolist()
 
-    # ✅ 손상 여부 판단
     non_damage_labels = [
         "2-1.이음부(Pipe-Joint,PJ)",
         "2-2.하수관로_내부(Inside,IN)",
@@ -93,7 +111,7 @@ def predict_image(image_path, save_path, video_title, frame_number):
     cam_resized = cv2.resize(cam, (original_width, original_height))
     heatmap = cv2.applyColorMap(np.uint8(255 * cam_resized), cv2.COLORMAP_JET)
     heatmap = np.float32(heatmap) / 255
-    original_np = np.array(original_image) / 255.0
+    original_np = np.array(original_image).astype(np.float32) / 255.0
     overlay = heatmap + original_np
     overlay = overlay / np.max(overlay)
     overlay = np.uint8(255 * overlay)
@@ -105,7 +123,6 @@ def predict_image(image_path, save_path, video_title, frame_number):
         label_string = ",".join(f"{l}({int(p*100)})" for l, p in zip(top3_labels, top3_probs_vals))
 
     base_filename = f"{video_title}_{frame_tag}_{label_string}"
-    # ✅ 저장
     image_save_path = os.path.join(save_path, f"{base_filename}.jpg")
     gradcam_save_path = os.path.join(save_path, f"{base_filename}_GradCAM.jpg")
 

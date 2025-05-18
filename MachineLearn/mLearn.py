@@ -4,6 +4,11 @@ import torch
 import torch.nn as nn
 import torch.optim as optim
 import torchvision.transforms as transforms
+import cv2
+import numpy as np
+import torchvision.transforms.v2 as transforms_v2  # PyTorch >=2.0
+import time
+
 from torch.cuda.amp import autocast, GradScaler
 from torch.optim import lr_scheduler
 from torchvision.models import resnext50_32x4d, ResNeXt50_32X4D_Weights
@@ -13,7 +18,9 @@ from sklearn.metrics import f1_score, accuracy_score, classification_report
 from torchvision.transforms.functional import to_pil_image
 from concurrent.futures import ThreadPoolExecutor
 from torch.serialization import add_safe_globals
-import numpy as np
+from collections import Counter
+from torchvision import transforms
+from sklearn.model_selection import StratifiedShuffleSplit
 
 ImageFile.LOAD_TRUNCATED_IMAGES = True
 
@@ -71,6 +78,45 @@ def generate_folder_label_map(root_dir, corrupted_txt_path=None, remove_corrupte
                     data.append((image_path, label_idx, label_name))
     return label_to_index, data
 
+def rand_bbox(size, lam):
+    W = size[2]
+    H = size[3]
+    cut_rat = np.sqrt(1. - lam)
+    cut_w = int(W * cut_rat)
+    cut_h = int(H * cut_rat)
+
+    cx = np.random.randint(W)
+    cy = np.random.randint(H)
+
+    bbx1 = np.clip(cx - cut_w // 2, 0, W)
+    bby1 = np.clip(cy - cut_h // 2, 0, H)
+    bbx2 = np.clip(cx + cut_w // 2, 0, W)
+    bby2 = np.clip(cy + cut_h // 2, 0, H)
+
+    return bbx1, bby1, bbx2, bby2
+
+def apply_cutmix(inputs, targets, alpha=1.0):
+    lam = np.random.beta(alpha, alpha)
+    rand_index = torch.randperm(inputs.size()[0])
+    target_a = targets
+    target_b = targets[rand_index]
+
+    bbx1, bby1, bbx2, bby2 = rand_bbox(inputs.size(), lam)
+    inputs[:, :, bbx1:bbx2, bby1:bby2] = inputs[rand_index, :, bbx1:bbx2, bby1:bby2]
+
+    return inputs, target_a, target_b, lam
+
+def apply_mixup(inputs, targets, alpha=1.0):
+    lam = np.random.beta(alpha, alpha)
+    rand_index = torch.randperm(inputs.size()[0])
+    mixed_inputs = lam * inputs + (1 - lam) * inputs[rand_index]
+    target_a = targets
+    target_b = targets[rand_index]
+    return mixed_inputs, target_a, target_b, lam
+
+def mix_criterion(criterion, outputs, target_a, target_b, lam):
+    return lam * criterion(outputs, target_a) + (1 - lam) * criterion(outputs, target_b)
+
 
 class FolderBasedDataset(Dataset):
     def __init__(self, root_dir, transform=None, corrupted_txt_path="corrupted.txt"):
@@ -98,15 +144,13 @@ class PreprocessedDataset(Dataset):
         return len(self.files)
 
     def __getitem__(self, idx):
-        data = torch.load(os.path.join(self.folder_path, self.files[idx]), weights_only=False)
-        img_array = data["img"]
-        if isinstance(img_array, str):
-            raise TypeError("img should be a numpy array, not str. Check preprocessing step.")
-        img_tensor = torch.from_numpy(img_array).permute(2, 0, 1).float()  # ✅ 이미 정규화된 float32
+        path = os.path.join(self.folder_path, self.files[idx])
+        data = torch.load(path, weights_only=False)
+        img_tensor = data["img"]
         label = data["label"]
         if self.transform:
             img_tensor = self.transform(img_tensor)
-        return img_tensor, label
+        return img_tensor, label, os.path.basename(path)  # ✅ 파일명도 함께 반환
 
 def get_unique_model_path(base_name="resnext_model", extension=".pth"):
     i = 0
@@ -116,43 +160,65 @@ def get_unique_model_path(base_name="resnext_model", extension=".pth"):
             return filename
         i += 1
 
+def apply_clahe(pil_img):
+    img = np.array(pil_img.convert("L"))  # Grayscale
+    clahe = cv2.createCLAHE(clipLimit=2.0, tileGridSize=(8,8))
+    cl_img = clahe.apply(img)
+    return Image.fromarray(cl_img).convert("RGB")
+
+def stretch_histogram(img):
+    img_np = np.asarray(img)
+    img_min = img_np.min()
+    img_max = img_np.max()
+    stretched = ((img_np - img_min) / (img_max - img_min + 1e-5) * 255.0).astype(np.uint8)
+    return Image.fromarray(stretched)
 
 def main():
     print("학습 시작")
     weights = ResNeXt50_32X4D_Weights.DEFAULT
-
-    base_transform = transforms.Compose([
-        transforms.Resize(232),
-        transforms.CenterCrop(224),
-        transforms.ToTensor(),
-        transforms.Normalize(mean=[0.485, 0.456, 0.406], std=[0.229, 0.224, 0.225])
+    
+    preprocess_transform = transforms.Compose([
+        transforms.Lambda(apply_clahe),                    # ✅ CLAHE (PIL 전용)
+        transforms.Lambda(stretch_histogram),              # ✅ 히스토그램 스트레칭 (PIL 전용)
+        transforms.Resize(256),                            # ✅ 충분히 크게 리사이즈 (선택)
+        transforms.CenterCrop(224),                        # ✅ 중앙 자르기
+        transforms.ToTensor()                              # ✅ Tensor 변환
     ])
 
-    train_transform = transforms.Compose([
-    transforms.RandomHorizontalFlip(p=0.5),                # 좌우 반전 (대부분의 이미지에서 기본)
-    transforms.RandomRotation(degrees=15),                 # 가벼운 회전 (회전 민감하지 않다면)
-    transforms.ColorJitter(brightness=0.1, contrast=0.1, saturation=0.1),  # 색상 변화
-    transforms.RandomErasing(p=0.1, scale=(0.02, 0.1)),    # 작은 영역 삭제 (강력한 regularization)
+    train_transform = transforms_v2.Compose([
+    transforms_v2.RandomResizedCrop(size=224, scale=(0.8, 1.0)),
+    transforms_v2.RandomHorizontalFlip(p=0.5),
+    transforms_v2.ColorJitter(brightness=0.2, contrast=0.2, saturation=0.2),
+    transforms_v2.RandomAffine(degrees=15, translate=(0.05, 0.05), scale=(0.95, 1.05), shear=5),
+    transforms_v2.RandomPerspective(distortion_scale=0.2, p=0.5),
+    transforms_v2.RandomRotation(15),
+    transforms_v2.GaussianBlur(kernel_size=3),
+    transforms_v2.RandomAdjustSharpness(sharpness_factor=2),
+    transforms_v2.RandomErasing(p=0.2, scale=(0.02, 0.08), ratio=(0.3, 3.3), value='random'),
+    transforms_v2.Normalize(mean=[0.485, 0.456, 0.406], std=[0.229, 0.224, 0.225])
+    ])
+    
+    val_transform = transforms_v2.Compose([
+    transforms_v2.Normalize(mean=[0.485, 0.456, 0.406], std=[0.229, 0.224, 0.225])  # ✅ 추가
     ])
 
-    val_transform = transforms.Compose([
-    ])
 
-    dataset_root = "학습데이터/원천데이터"
+    dataset_root = "C:/Users/parkerpark/Downloads/학습 동일 소형 데이터"
     corrupted_txt_path = "corrupted.txt"
-    dataset = FolderBasedDataset(dataset_root, transform=base_transform, corrupted_txt_path=corrupted_txt_path)
+    dataset = FolderBasedDataset(dataset_root, corrupted_txt_path=corrupted_txt_path)
     class_map = dataset.class_map
 
     preprocessed_dir = "preprocessed_from_folder"
     os.makedirs(preprocessed_dir, exist_ok=True)
+    
     if len(os.listdir(preprocessed_dir)) >= len(dataset):
         print(f"⏭️ 전처리된 이미지가 이미 {len(os.listdir(preprocessed_dir))}개 존재합니다. 전처리 스킵.")
     else:
         for i, (img_path, label, label_name) in enumerate(dataset.items):
             pt_path = os.path.join(preprocessed_dir, f"img_{i}.pt")
-            image = Image.open(img_path).convert("RGB").resize((232, 232), resample=Image.BICUBIC)  # 🔧 크기 고정
-            img_np = np.array(image).astype(np.float32) / 255.0              # ✅ float32 저장 + 정규화
-            torch.save({"img": img_np, "label": label, "class_name": label_name, "path": img_path}, pt_path)
+            image = Image.open(img_path).convert("RGB")
+            img_tensor = preprocess_transform(image)  # ⬅️ 명시적 transform 적용
+            torch.save({"img": img_tensor, "label": label, "class_name": label_name, "path": img_path}, pt_path)
 
 
     files = sorted(os.listdir(preprocessed_dir))
@@ -170,7 +236,15 @@ def main():
     train_size = int(0.9 * len(dataset))
     val_size = len(dataset) - train_size
     generator = torch.Generator().manual_seed(42)
-    train_dataset, val_dataset = random_split(dataset, [train_size, val_size], generator=generator)
+    
+    # 라벨 기반 Stratified split
+    labels = np.array(labels)
+    splitter = StratifiedShuffleSplit(n_splits=1, test_size=0.1, random_state=42)
+    train_idx, val_idx = next(splitter.split(np.zeros(len(labels)), labels))
+
+    train_dataset = torch.utils.data.Subset(dataset, train_idx)
+    val_dataset = torch.utils.data.Subset(dataset, val_idx)
+    
     train_dataset.dataset.transform = train_transform
     val_dataset.dataset.transform = val_transform
 
@@ -181,32 +255,74 @@ def main():
     model = resnext50_32x4d(weights=weights)
     model.fc = nn.Linear(model.fc.in_features, num_classes)
     model = model.to(device)
+    
+    # 라벨로부터 클래스 분포 계산
+    class_counts = Counter(labels)
+    num_classes = max(class_counts.keys()) + 1
+    total_samples = sum(class_counts.values())
 
-    criterion = nn.CrossEntropyLoss()
+    # 클래스별 가중치 계산
+    weights = [total_samples / (num_classes * class_counts[i]) for i in range(num_classes)]
+    class_weights = torch.tensor(weights, dtype=torch.float).to(device)
+
+    # 출력
+    print("\n📊 클래스별 샘플 수 및 가중치:")
+    for i in range(num_classes):
+        print(f"클래스 {i} | 샘플 수: {class_counts[i]} | 가중치: {weights[i]:.4f}")
+
+    # 크로스 엔트로피 손실 함수에 가중치 적용
+    criterion = nn.CrossEntropyLoss(weight=class_weights)
+    
     optimizer = optim.Adam(model.parameters(), lr=0.001)
     scaler = GradScaler(init_scale=65536.0)  # 또는 기본값 사용
-    scheduler = lr_scheduler.StepLR(optimizer, step_size=5, gamma=0.1)
-
+    scheduler = lr_scheduler.ReduceLROnPlateau(optimizer, mode='min', factor=0.5, patience=2)
+    
+    # 🎯 원하는 방식 설정 (선택)
+    use_cutmix = True      # ✅ CutMix 사용
+    use_mixup = False      # ✅ MixUp 사용
+    mix_alpha = 0.4        # 혼합 강도
+    
     for epoch in range(10):
+        start_time = time.time()  # ⏱ 시작 시간 기록
+
         model.train()
         running_loss = 0.0
-        for images, labels in train_loader:
+        total_batches = len(train_loader)
+
+        for batch_idx, (images, labels, filenames) in enumerate(train_loader):
             images, labels = images.to(device), labels.to(device)
             optimizer.zero_grad()
+
+            # ✨ CutMix or MixUp 적용
+            if use_cutmix:
+                images, targets_a, targets_b, lam = apply_cutmix(images, labels, alpha=mix_alpha)
+            elif use_mixup:
+                images, targets_a, targets_b, lam = apply_mixup(images, labels, alpha=mix_alpha)
+
             with autocast():
                 outputs = model(images)
-                loss = criterion(outputs, labels)
+                if use_cutmix or use_mixup:
+                    loss = mix_criterion(criterion, outputs, targets_a, targets_b, lam)
+                else:
+                    loss = criterion(outputs, labels)
+
             scaler.scale(loss).backward()
             scaler.step(optimizer)
             scaler.update()
             running_loss += loss.item()
-        scheduler.step()
-        print(f"[Epoch {epoch+1}] Loss: {running_loss / len(train_loader):.4f}")
+
+            print(f"🌀 Epoch {epoch+1} | Batch {batch_idx+1}/{total_batches} | "
+                f"PT: {filenames[0]} | Loss: {loss.item():.4f}", end='\r')
+
+        scheduler.step(running_loss)
+        epoch_time = time.time() - start_time  # ⏱ 경과 시간 계산
+        print(f"\n✅ [Epoch {epoch+1}] 평균 Loss: {running_loss / total_batches:.4f} | "
+            f"⏱ 소요 시간: {epoch_time:.2f}초")
 
     model.eval()
     all_preds, all_labels = [], []
     with torch.no_grad():
-        for images, labels in val_loader:
+        for images, labels, _ in val_loader:
             images, labels = images.to(device), labels.to(device)
             outputs = model(images)
             _, preds = torch.max(outputs, 1)

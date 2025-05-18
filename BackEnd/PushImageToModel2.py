@@ -24,7 +24,7 @@ num_classes = max(class_map.keys()) + 1 if class_map else 11
 model = resnext50_32x4d(weights=weights)
 model.fc = torch.nn.Linear(model.fc.in_features, num_classes)
 
-checkpoint = torch.load("resnext_model_2.pth", map_location="cpu")
+checkpoint = torch.load("resnext_model.pth", map_location="cpu")
 
 try:
     model.load_state_dict(checkpoint, strict=True)
@@ -41,16 +41,12 @@ model.eval()
 # ✅ 단일 이미지 분석
 def analyze_image(image_path, save_dir):
     image_name = os.path.basename(image_path)
-    original = Image.open(image_path).convert("RGB")
-    original_resized = original.resize((232, 232), resample=Image.BICUBIC)
-    original_cropped = transforms.CenterCrop(224)(original_resized)
-
-    # ✅ 새로운 전처리 적용
-    img_np = np.array(original_cropped).astype(np.float32) / 255.0
-    tensor = torch.from_numpy(img_np).permute(2, 0, 1).unsqueeze(0).to(device)
+    original_image = Image.open(image_path).convert("RGB")
+    original_width, original_height = original_image.size
+    image_tensor = preprocess_image_like_training(original_image)  # ✅ 올바른 전처리
 
     with torch.no_grad():
-        output = model(tensor)
+        output = model(image_tensor)
         probs = torch.nn.functional.softmax(output, dim=1)
         top_probs, top_preds = torch.topk(probs, 3)
 
@@ -63,17 +59,22 @@ def analyze_image(image_path, save_dir):
 
     # ✅ Grad-CAM 생성
     grad_cam = GradCAM(model, target_layer=model.layer4[-1])
-    cam = grad_cam.generate_cam(tensor)
+    cam = grad_cam.generate_cam(image_tensor)  # ❗ 'tensor' → 'image_tensor'
     if cam is None or np.max(cam) == 0 or np.isnan(np.max(cam)):
         print("⚠️ Grad-CAM 생성 실패")
         return
 
     cam = np.maximum(cam, 0)
     cam = cam / np.max(cam)
-    cam_resized = cv2.resize(cam, original_cropped.size)
+    cam_resized = cv2.resize(cam, (original_width, original_height))  # ✅ size는 tuple
+
     heatmap = cv2.applyColorMap(np.uint8(255 * cam_resized), cv2.COLORMAP_JET)
-    overlay = np.array(original_cropped) / 255.0 + heatmap / 255.0
-    overlay = np.uint8(255 * (overlay / np.max(overlay)))
+    heatmap = np.float32(heatmap) / 255
+    original_np = np.array(original_image).astype(np.float32) / 255.0
+
+    overlay = heatmap + original_np
+    overlay = overlay / np.max(overlay + 1e-8)  # ✅ 안전 정규화
+    overlay = np.uint8(255 * np.clip(overlay, 0, 1))
 
     # ✅ Grad-CAM 저장
     filename = os.path.splitext(image_name)[0] + "_GradCAM.jpg"
@@ -89,6 +90,11 @@ def analyze_image(image_path, save_dir):
     else:
         print(f"❌ Grad-CAM 저장 실패: {gradcam_save_path}")
 
+def preprocess_image_like_training(image: Image.Image) -> torch.Tensor:
+    resized = image.resize((232, 232), resample=Image.BICUBIC)
+    img_np = np.array(resized).astype(np.float32) / 255.0
+    img_tensor = torch.from_numpy(img_np).permute(2, 0, 1).unsqueeze(0).to(device)
+    return img_tensor
 
 # ✅ 폴더 내 모든 이미지 분석
 def analyze_folder(image_dir, save_dir):
