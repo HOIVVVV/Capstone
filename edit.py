@@ -29,6 +29,9 @@ app.config['SQLALCHEMY_DATABASE_URI'] = 'mysql+pymysql://root:autoset@localhost/
 app.config['SQLALCHEMY_TRACK_MODIFICATIONS'] = False
 db = SQLAlchemy(app)
 
+#경로설정
+path = "upload.html"
+
 class DamageImage(db.Model):
     __tablename__ = 'damage_images'
     image_id = db.Column(db.Integer, primary_key=True)
@@ -55,7 +58,21 @@ def index():
     
     min_date = db.session.query(func.min(Video.recorded_date)).scalar()
     max_date = db.session.query(func.max(Video.recorded_date)).scalar()
-    return render_template('edit.html',
+    return render_template(path,
+        damage_types=[d[0] for d in damage_types],
+        locations=[l[0] for l in locations],
+        min_date = min_date,
+        max_date = max_date
+    )
+    
+@app.route('/mapping')
+def mapping_page():
+    damage_types = db.session.query(DamageImage.damage_type).distinct().all()
+    locations = db.session.query(Video.location).distinct().all()
+    
+    min_date = db.session.query(func.min(Video.recorded_date)).scalar()
+    max_date = db.session.query(func.max(Video.recorded_date)).scalar()
+    return render_template('mapping.html',
         damage_types=[d[0] for d in damage_types],
         locations=[l[0] for l in locations],
         min_date = min_date,
@@ -122,7 +139,7 @@ def generate_chart():
         summary = df.groupby('period').size().reset_index(name='count')
         fig = px.line(summary, x = 'period', y= 'count')
         chart_html =  fig.to_html(full_html=False)
-        return render_template("edit.html", chart_html=chart_html,
+        return render_template(path, chart_html=chart_html,
                            start_date=start_date,
                            end_date=end_date,
                            selected_damage_types=selected_damage_types,
@@ -149,7 +166,7 @@ def generate_chart():
         else:
             return '위치 또는 손상 유형 중 하나 이상 선택해주세요.'
         chart_html =  fig.to_html(full_html=False)
-        return render_template("edit.html", chart_html=chart_html,
+        return render_template(path, chart_html=chart_html,
                            start_date=start_date,
                            end_date=end_date,
                            selected_damage_types=selected_damage_types,
@@ -201,7 +218,7 @@ def generate_chart():
             fig = px.pie(summary, values='count', names='damage_type', title='손상 유형 분포', hole=0.3)
 
         else:
-            return render_template("edit.html", chart_html="<p style='text-align:center;'>위치 또는 손상 유형 중 하나 이상 선택해주세요.</p>",
+            return render_template(path, chart_html="<p style='text-align:center;'>위치 또는 손상 유형 중 하나 이상 선택해주세요.</p>",
                            start_date=start_date,
                            end_date=end_date,
                            selected_damage_types=selected_damage_types,
@@ -214,7 +231,7 @@ def generate_chart():
 
         # ✅ HTML로 변환하여 템플릿에 전달
         chart_html = fig.to_html(full_html=False)
-        return render_template("edit.html", chart_html=chart_html,
+        return render_template(path, chart_html=chart_html,
                            start_date=start_date,
                            end_date=end_date,
                            selected_damage_types=selected_damage_types,
@@ -234,7 +251,7 @@ def generate_chart():
         if selected_damage_types:
             cols = pivot.columns.intersection(selected_damage_types)
             if cols.empty:
-                return render_template("edit.html", chart_html="<p style='text-align:center;'>선택한 손상 유형에 해당하는 데이터가 없습니다.</p>",
+                return render_template(path, chart_html="<p style='text-align:center;'>선택한 손상 유형에 해당하는 데이터가 없습니다.</p>",
                            start_date=start_date,
                            end_date=end_date,
                            selected_damage_types=selected_damage_types,
@@ -258,7 +275,7 @@ def generate_chart():
         fig.update_layout(title='위치별 손상유형 히트맵', xaxis_title="손상 유형", yaxis_title="위치")
 
         chart_html = fig.to_html(full_html=False)
-        return render_template("edit.html", chart_html=chart_html,
+        return render_template(path, chart_html=chart_html,
                            start_date=start_date,
                            end_date=end_date,
                            selected_damage_types=selected_damage_types,
@@ -278,7 +295,7 @@ def generate_chart():
         if selected_damage_types:
             cols = pivot.columns.intersection(selected_damage_types)
             if cols.empty:
-                return render_template("edit.html", chart_html="<p style='text-align:center;'>선택한 손상 유형에 해당하는 데이터가 없습니다.</p>",
+                return render_template(path, chart_html="<p style='text-align:center;'>선택한 손상 유형에 해당하는 데이터가 없습니다.</p>",
                            start_date=start_date,
                            end_date=end_date,
                            selected_damage_types=selected_damage_types,
@@ -307,7 +324,7 @@ def generate_chart():
         )
 
         chart_html = fig.to_html(full_html=False)
-        return render_template("edit.html", chart_html=chart_html,
+        return render_template(path, chart_html=chart_html,
                            start_date=start_date,
                            end_date=end_date,
                            selected_damage_types=selected_damage_types,
@@ -319,65 +336,65 @@ def generate_chart():
                            chart_type = chart_type)
     
     elif chart_type == 'map':
+        import requests
+
         # ✅ 사용자 선택 정보 가져오기
         selected_locations = request.form.getlist("location")
-        selected_dtypes = request.form.getlist("damage_type")
+        selected_damage_types = request.form.getlist("damage_type")
 
-        # ✅ DB에서 조건에 맞는 데이터 조회
+        # ✅ DB에서 조건에 맞는 데이터 조회 (손상 수 있는 구만 집계됨)
         results = db.session.query(
             Video.location,
             func.count(DamageImage.image_id)
         ).join(DamageImage, Video.video_id == DamageImage.video_id)\
         .filter(Video.location.in_(selected_locations),
-                DamageImage.damage_type.in_(selected_dtypes))\
+                DamageImage.damage_type.in_(selected_damage_types))\
         .group_by(Video.location)\
         .all()
 
-        # ✅ 결과를 Pandas DataFrame으로 변환
-        df_count = pd.DataFrame(results, columns=["구", "데이터수"])
-        df_count.columns = ["location", "count"]
+        # ✅ DB 결과를 DataFrame으로 변환
+        df_result = pd.DataFrame(results, columns=["location", "count"])
+
+        # ✅ 선택된 location 리스트를 기준으로 0 포함 데이터프레임 생성
+        df_all_locations = pd.DataFrame(selected_locations, columns=["location"])
+
+        # ✅ 병합하여 손상 수 없는 location은 count = 0으로 처리
+        df_count = pd.merge(df_all_locations, df_result, on="location", how="left").fillna(0)
+        df_count["count"] = df_count["count"].astype(int)
 
         # ✅ 지도 객체 생성
         m = folium.Map(location=[37.5665, 126.9780], zoom_start=11)
 
-        # # GeoJSON 파일 경로
-        # geojson_path = 'static/data/HangJeongDong_ver20250401.geojson'
-        
-        # # GeoJSON 파일 불러오기
-        # gdf = gpd.read_file('static/data/HangJeongDong_ver20250401.geojson')
+        # ✅ 서울시 구 단위 GeoJSON 불러오기 (GitHub에서 직접 요청)
+        url = 'https://raw.githubusercontent.com/southkorea/seoul-maps/master/kostat/2013/json/seoul_municipalities_geo_simple.json'
+        response = requests.get(url)
+        if response.status_code != 200:
+            return "GeoJSON 파일 로드 실패", 500
 
-        # # '구' 단위로 병합 (예: sggnm 컬럼이 구 이름이라면)
-        # gdf_gu = gdf.dissolve(by='sggnm', as_index=False)
+        seoul_gu_geo = response.json()
 
-        # # 병합된 GeoJSON 저장 (선택)
-        # gdf_gu.to_file('static/data/Seoul_Gu_Aggregated.geojson', driver='GeoJSON')
-
-        # 파일 로드
-        with open('static/data/Seoul_Gu_Aggregated.geojson', 'r', encoding='utf-8') as f:
-            seoul_gu_geo = json.load(f)
-            
-        # 구 이름 -> 중심 좌표 dict
+        # ✅ 구 이름 -> 중심 좌표 dict 생성
         gu_centers = {}
         for feature in seoul_gu_geo["features"]:
-            gu_name = feature["properties"]["sggnm"]
+            gu_name = feature["properties"]["name"]
             geometry = shape(feature["geometry"])
             centroid = geometry.centroid
             gu_centers[gu_name] = [centroid.y, centroid.x]  # folium은 [lat, lon]
 
-        # ✅ Choropleth로 시각화
+        # ✅ Choropleth 시각화
         folium.Choropleth(
             geo_data=seoul_gu_geo,
             name="choropleth",
-            data=df_count,  # pandas DataFrame (예: 구별 손상 개수)
-            columns=["location", "count"],  # 'location'은 성북구, 강남구 등과 매칭되어야 함
-            key_on="feature.properties.sggnm",  # 여기 수정!
+            data=df_count,
+            columns=["location", "count"],
+            key_on="feature.properties.name",
             fill_color="YlOrRd",
             fill_opacity=0.7,
             line_opacity=0.2,
             legend_name="손상 건수"
         ).add_to(m)
-        
-            # ✅ GeoJSON 경계선 스타일 지정
+
+        # ✅ GeoJSON 경계선 스타일 + 툴팁 추가
         folium.GeoJson(
             seoul_gu_geo,
             name="구 경계",
@@ -388,11 +405,12 @@ def generate_chart():
                 'dashArray': '5, 5'
             },
             tooltip=folium.GeoJsonTooltip(
-                fields=["sggnm"],
+                fields=["name"],
                 aliases=["지역:"]
             )
         ).add_to(m)
-        
+
+        # ✅ 각 구에 마커 추가 (손상 건수 숫자 표시)
         for idx, row in df_count.iterrows():
             gu_name = row["location"]
             count = row["count"]
@@ -405,20 +423,34 @@ def generate_chart():
                     )
                 ).add_to(m)
 
-
-
-        
+        # ✅ chart HTML 렌더링
         chart_html = m._repr_html_()
-        return render_template("edit.html", chart_html=chart_html,
-                           start_date=start_date,
-                           end_date=end_date,
-                           selected_damage_types=selected_damage_types,
-                           selected_locations=selected_locations,
-                           damage_types=damage_types,   # 전체 리스트
-                           locations=locations,         # 전체 리스트
-                           min_date=min_date,
-                           max_date=max_date,
-                           chart_type = chart_type)
+
+        # ✅ 전체 damage_types, locations, 날짜 범위 추출
+        all_damage_types = db.session.query(DamageImage.damage_type).distinct().all()
+        all_locations = db.session.query(Video.location).distinct().all()
+        damage_types = [d[0] for d in all_damage_types]
+        locations = [l[0] for l in all_locations]
+
+        # ✅ 날짜 범위 계산
+        min_date_query = db.session.query(func.min(Video.recorded_date)).scalar()
+        max_date_query = db.session.query(func.max(Video.recorded_date)).scalar()
+        min_date = min_date_query.strftime('%Y-%m-%d') if min_date_query else ''
+        max_date = max_date_query.strftime('%Y-%m-%d') if max_date_query else ''
+
+        return render_template(path,
+                               chart_html=chart_html,
+                               start_date=start_date,
+                               end_date=end_date,
+                               selected_damage_types=selected_damage_types,
+                               selected_locations=selected_locations,
+                               damage_types=damage_types,
+                               locations=locations,
+                               min_date=min_date,
+                               max_date=max_date,
+                               chart_type=chart_type)
+
+
 
     else:
         return '그래프 종류를 선택해주세요.'
@@ -428,7 +460,6 @@ def generate_chart():
     plt.savefig(img, format='png')
     img.seek(0)
     return send_file(img, mimetype='image/png')
-
 
 @app.route('/front')
 def front_page():
