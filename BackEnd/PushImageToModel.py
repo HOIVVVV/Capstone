@@ -25,7 +25,7 @@ class_map = load_class_map("class_map.json")
 num_classes = max(class_map.keys()) + 1
 model.fc = torch.nn.Linear(model.fc.in_features, num_classes)
 
-checkpoint = torch.load("resnext_model.pth", map_location=device)
+checkpoint = torch.load("resnext_model_5.pth", map_location=device)
 model.load_state_dict(checkpoint, strict=False)
 model.to(device)
 model.eval()
@@ -88,7 +88,7 @@ def predict_image(image_path, save_path, video_title, frame_number):
         "2-3-3.하수관로_외부_자동차"
     ]
 
-    if top3_probs_vals[0] >= 0.75:
+    if top3_probs_vals[0] >= 0.65:
         damage_detected = top3_labels[0] not in non_damage_labels
     else:
         damage_detected = any(label not in non_damage_labels for label in top3_labels)

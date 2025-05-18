@@ -203,7 +203,7 @@ def main():
     ])
 
 
-    dataset_root = "C:/Users/parkerpark/Downloads/학습 동일 소형 데이터"
+    dataset_root = "테스트데이터"#"C:/Users/parkerpark/Downloads/학습 동일 소형 데이터"
     corrupted_txt_path = "corrupted.txt"
     dataset = FolderBasedDataset(dataset_root, corrupted_txt_path=corrupted_txt_path)
     class_map = dataset.class_map
@@ -260,17 +260,26 @@ def main():
     class_counts = Counter(labels)
     num_classes = max(class_counts.keys()) + 1
     total_samples = sum(class_counts.values())
+    
+    
+    # 📊 클래스별 샘플 수 출력만 (가중치 계산 및 적용 X)
+    #print("\n📊 클래스별 샘플 수:")
+    #for i in range(num_classes):
+    #    print(f"클래스 {i} | 샘플 수: {class_counts[i]}")
 
-    # 클래스별 가중치 계산
+    # ❌ 가중치 없이 기본 CrossEntropyLoss 사용
+    #criterion = nn.CrossEntropyLoss()
+
+    #클래스별 가중치 계산
     weights = [total_samples / (num_classes * class_counts[i]) for i in range(num_classes)]
     class_weights = torch.tensor(weights, dtype=torch.float).to(device)
 
-    # 출력
+    #출력
     print("\n📊 클래스별 샘플 수 및 가중치:")
     for i in range(num_classes):
         print(f"클래스 {i} | 샘플 수: {class_counts[i]} | 가중치: {weights[i]:.4f}")
 
-    # 크로스 엔트로피 손실 함수에 가중치 적용
+    #크로스 엔트로피 손실 함수에 가중치 적용
     criterion = nn.CrossEntropyLoss(weight=class_weights)
     
     optimizer = optim.Adam(model.parameters(), lr=0.001)
