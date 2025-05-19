@@ -48,7 +48,7 @@
 
       <!-- ✅ 분석 시작 버튼 -->
       <button onclick="uploadVideo()"
-              style="margin-top: 20px; padding: 10px 20px;
+              style="margin-top: 20px; margin-bottom: 40px; padding: 10px 20px;
                     background-color: #007bff; color: white; border: none; border-radius: 5px;">
         분석 시작
       </button>
@@ -71,9 +71,10 @@
 
     <!-- ✅ 결과 이미지 그리드 -->
     <div id="result-grid"
-         style="display: grid; grid-template-columns: repeat(auto-fill, minmax(200px, 1fr));
-                gap: 20px; justify-items: center;">
+     style="display: grid; grid-template-columns: repeat(auto-fill, minmax(200px, 1fr));
+            gap: 20px; justify-items: center;">
     </div>
+
 
     <!-- ✅ 확인 버튼 -->
     <div style="text-align: center; margin-top: 30px;">
@@ -86,6 +87,15 @@
 
   </div>
 
+</div>
+
+<!-- 이미지 확대 모달 -->
+<div id="imageModal" style="display: none; position: fixed; z-index: 9999; left: 0; top: 0;
+  width: 100%; height: 100%; background-color: rgba(0,0,0,0.8); justify-content: center; align-items: center;">
+  <img id="modalImage" src="" alt="확대 이미지"
+    style="max-width: 90%; max-height: 90%; transform: scale(1); transition: transform 0.3s ease;" />
+  <button onclick="closeModal()"
+    style="position: absolute; top: 20px; right: 30px; font-size: 24px; color: white; background: none; border: none; cursor: pointer;">✖</button>
 </div>
 
 
@@ -131,7 +141,7 @@
 
     const formData = new FormData();
     for (const file of uploadedFiles) {
-      formData.append("video", file);  // 다중이면 video[] 사용 가능
+    formData.append("video[]", file);  // ✅ 배열 형태로 전달
     }
 
     fetch("/upload", {
@@ -209,14 +219,29 @@
     img.style.borderRadius = '6px';
     img.style.marginBottom = '8px';
     img.dataset.path = imgPath;
+    img.onclick = () => openModal(img.src);
 
     const caption = document.createElement('div');
     caption.textContent = label;
-    caption.style = "font-size: 13px; margin-bottom: 10px; text-align: center; word-break: break-word;";
+    caption.style = `
+  font-size: 13px;
+  margin-bottom: 10px;
+  text-align: center;
+  word-break: break-word;
+  white-space: pre-line;
+`;
 
     const delBtn = document.createElement('button');
     delBtn.textContent = "삭제";
-    delBtn.style = "padding: 5px 10px; background-color: #dc3545; color: white; border: none; border-radius: 5px;";
+    delBtn.style = `
+  margin-top: auto;
+  margin-bottom: 8px;  /* ✅ 아래쪽에 여유 주기 */
+  padding: 5px 10px;
+  background-color: #dc3545;
+  color: white;
+  border: none;
+  border-radius: 5px;
+`;
     delBtn.onclick = () => deleteImage(imgPath, card);
 
     card.appendChild(img);
@@ -230,8 +255,49 @@
 }
 
 function extractLabelFromPath(path) {
-  const match = path.match(/_(.*?)\.(jpg|png)/);
-  return match ? match[1].replace(/_/g, ", ") : "분류 없음";
+  const classMap = {
+    "1-1.균열(Crack,CL)": 0,
+    "1-2.표면손상(Surface-Damage,SD)": 1,
+    "1-3.파손(Broken-Pipe,BK)": 2,
+    "1-4.연결관-돌출(Lateral-Protruding,LP)": 3,
+    "1-5.이음부-손상(Joint-Faulty,JF)": 4,
+    "1-6.토사퇴적(Deposits-Silty,DS)": 5,
+    "1-7.기타결함(Etc.,ETC)": 6,
+    "2-1.관로_내부(Inside,IN)": 7,
+    "2-2.관로_외부": 8
+  };
+
+  // ▶ ".뒤" 이름만 추출 (ex. "균열(Crack,CL)")
+  const labelNameMap = Object.keys(classMap).reduce((acc, key) => {
+    const match = key.match(/^[^\.]+\.(.+)$/);
+    if (match) {
+      const shortName = match[1];
+      acc[shortName] = key;
+    }
+    return acc;
+  }, {});
+
+  const results = [];
+
+  // ▶ path에서 (숫자) 앞까지 자르기 위한 정규식
+  const regex = /(.+?)\((\d+)\)/g;
+  let match;
+  while ((match = regex.exec(path)) !== null) {
+    const raw = match[1].replace(/_/g, ' ').trim(); // '토사퇴적(Deposits-Silty,DS)'
+    const score = match[2];
+
+    for (const key in labelNameMap) {
+      if (raw.includes(key)) {
+        const full = labelNameMap[key];
+        const koreanOnly = full.split('.')[1].split('(')[0].trim(); // 예: '토사퇴적'
+        results.push(koreanOnly + ` (${score})`);
+        break;
+      }
+    }
+  }
+
+  // 순위로 정렬
+  return results.map((val, idx) => `${idx + 1}순위: ${val}`).join('\n');
 }
 
 function deleteImage(path, wrapperElement) {
@@ -264,5 +330,37 @@ function confirmResults() {
     }
   });
 }
+
+let zoom = 1;
+
+function openModal(src) {
+  const modal = document.getElementById("imageModal");
+  const modalImg = document.getElementById("modalImage");
+  modalImg.src = src;
+  zoom = 1;
+  modalImg.style.transform = `scale(${zoom})`;
+  modal.style.display = "flex";
+}
+
+function closeModal() {
+  document.getElementById("imageModal").style.display = "none";
+}
+
+// 확대/축소 (마우스 휠)
+document.getElementById("imageModal").addEventListener("wheel", function (e) {
+  e.preventDefault();
+  if (e.deltaY < 0) {
+    zoom += 0.1;
+  } else {
+    zoom = Math.max(1, zoom - 0.1);
+  }
+  document.getElementById("modalImage").style.transform = `scale(${zoom})`;
+});
+
+document.addEventListener('keydown', function (e) {
+  if (e.key === 'Escape') {
+    closeModal();
+  }
+});
 </script>
 {% endblock %}

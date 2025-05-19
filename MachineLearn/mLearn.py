@@ -291,7 +291,7 @@ def main():
     use_mixup = False      # ✅ MixUp 사용
     mix_alpha = 0.4        # 혼합 강도
     
-    for epoch in range(10):
+    for epoch in range(20):
         start_time = time.time()  # ⏱ 시작 시간 기록
 
         model.train()

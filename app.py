@@ -14,7 +14,7 @@ app.config['UPLOAD_FOLDER'] = UPLOAD_FOLDER
 app.config['FRAME_FOLDER'] = FRAME_FOLDER
 
 # DB 설정
-app.config['SQLALCHEMY_DATABASE_URI'] = 'mysql+pymysql://root:autoset@localhost/capstone'
+app.config['SQLALCHEMY_DATABASE_URI'] = 'mysql+pymysql://root:1234@localhost/capstone'  #비밀번호 아이디 확인할 것!
 app.config['SQLALCHEMY_TRACK_MODIFICATIONS'] = False
 
 # SQLAlchemy 초기화

@@ -8,6 +8,7 @@ from werkzeug.utils import secure_filename
 from BackEnd.analyze_video import analyze_video  # 기존 함수 import
 from BackEnd import progress
 from BackEnd.db.insert_to_db import insert_analysis_results_selected
+from BackEnd.db.models import db, DamageImage, Video  # 모델 경로에 맞게 조정
 
 main = Blueprint('main', __name__)
 
@@ -28,6 +29,23 @@ def result():
 def map():
     return render_template("map.html", active_page="map")
 
+@main.route("/api/count_summary")
+def count_summary():
+    try:
+        damage_count = db.session.query(DamageImage).count()
+        video_count = db.session.query(Video).count()
+
+        return jsonify({
+            "damage_images": damage_count,
+            "videos": video_count
+        })
+    except Exception as e:
+        print("📛 /api/count_summary 오류:", e)
+        return jsonify({
+            "damage_images": 0,
+            "videos": 0
+        }), 500
+        
 #진행도 바
 @main.route('/progress')
 def get_progress():
@@ -56,7 +74,7 @@ def upload_video():
         return jsonify({'success': False, 'message': 'No video provided'})
 
     # ✅ 단일 혹은 다중 업로드 지원
-    files = request.files.getlist('video') or request.files.getlist('video[]')
+    files = request.files.getlist('video[]')
     uploaded_paths = []
 
     for file in files:

@@ -99,6 +99,14 @@ def analyze_video(video_path):
     meta_path = os.path.join(result_output_folder, "meta.json")
     with open(meta_path, "w", encoding="utf-8") as f:
         json.dump(meta_info, f, ensure_ascii=False, indent=2)
+        
+    # ✅ 분석 끝난 후 영상 삭제
+    try:
+        if os.path.exists(video_path):
+            os.remove(video_path)
+            print(f"🧹 업로드 영상 삭제됨: {video_path}")
+    except Exception as e:
+        print(f"⚠️ 업로드 영상 삭제 실패: {e}")
 
     progress["step"] = "✅ 분석 완료!"
     progress["percent"] = 100

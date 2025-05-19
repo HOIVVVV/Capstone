@@ -25,11 +25,11 @@ weights = ResNeXt50_32X4D_Weights.DEFAULT
 model = resnext50_32x4d(weights=weights)
 
 #모델 클래스 로드드
-class_map = load_class_map("class_map2.json")
+class_map = load_class_map("class_map.json")
 num_classes = max(class_map.keys()) + 1
 model.fc = torch.nn.Linear(model.fc.in_features, num_classes)
 
-checkpoint = torch.load("resnext_model_5.pth", map_location=device)
+checkpoint = torch.load("resnext_model_final.pth", map_location=device)
 model.load_state_dict(checkpoint, strict=False)
 model.to(device)
 model.eval()
@@ -97,14 +97,15 @@ def predict_image(image_path, save_path, video_title, frame_number):
     top3_probs_vals = top3_probs[0].tolist()
 
     non_damage_labels = [
-        "2-2.하수관로_내부(Inside,IN)",
-        "2-3-1.하수관로_외부",
+        "2-1.관로_내부(Inside,IN)",
+        "2-2.관로_외부",
     ]
 
     if top3_probs_vals[0] >= 0.5:
         damage_detected = top3_labels[0] not in non_damage_labels
     else:
-        damage_detected = any(label not in non_damage_labels for label in top3_labels)
+        # top1이 50% 미만이면 top2까지만 확인
+        damage_detected = any(label not in non_damage_labels for label in top3_labels[:2])
 
     print(f"\n📄 [{os.path.basename(image_path)}] 분석 결과:")
     for i, (label, prob) in enumerate(zip(top3_labels, top3_probs_vals), 1):
