@@ -10,7 +10,7 @@ sys.path.append(os.path.abspath(os.path.dirname(__file__)))
 from PIL import Image
 from torchvision.models import resnext50_32x4d, ResNeXt50_32X4D_Weights
 from Grad_cam import GradCAM
-from progress import progress
+from BackEnd import progress
 
 # ✅ 클래스 맵 로딩 (index → 라벨명)
 def load_class_map(path):
@@ -64,10 +64,11 @@ def predict_images_in_folder(folder_path, save_base_path, video_title):
     total = len(image_files)
 
     for idx, filename in enumerate(image_files):
-        percent = int((idx + 1) / total * 100)
+        percent = 50 + int((idx + 1) / total * 40)  # 50% ~ 90% 사이
         progress["percent"] = percent
-        progress["step"] = f"이미지 분석 중... ({idx + 1}/{total})"
+        progress["step"] = f"🧠 이미지 분석 중... ({idx + 1}/{total})"
         progress["current_file"] = filename
+        print(progress)
 
         image_path = os.path.join(folder_path, filename)
         save_path = os.path.join(save_base_path, video_title)  # ✅ 정확한 영상 제목 폴더로 저장

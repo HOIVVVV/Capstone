@@ -1,6 +1,7 @@
 import os
 import sys
 import shutil
+import json
 import pytesseract
 sys.path.append(os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 from datetime import datetime
@@ -9,71 +10,113 @@ from BackEnd.PushImageToModel import predict_images_in_folder
 from BackEnd.GetTextFromImage import analyze_images_in_folder
 from PIL import Image
 from db.insert_to_db import insert_analysis_results
+from BackEnd import progress
+import shutil
 
 def analyze_video(video_path):
     if not os.path.isfile(video_path):
         print("❌ 유효하지 않은 영상 경로입니다.")
         return
 
+    # ✅ 기존 static 결과 삭제
+    static_results_dir = os.path.join("static", "results")
+    if os.path.exists(static_results_dir):
+        shutil.rmtree(static_results_dir)
+    os.makedirs(static_results_dir, exist_ok=True)
+
+    progress["step"] = "📂 영상 확인 중..."
+    progress["percent"] = 5
+
     timestamp = datetime.now().strftime("%Y%m%d_%H%M%S")
     frame_output_folder = f"temp_frames_{timestamp}"
     frame_output_path = os.path.abspath(frame_output_folder)
-
-    # ✅ 실제 폴더 생성
     os.makedirs(frame_output_path, exist_ok=True)
-        
-    # ✅ 결과 폴더는 'Result/' 아래에 생성
+
     result_root = "Result"
     result_output_folder = os.path.join(result_root, f"results_{timestamp}")
     os.makedirs(result_output_folder, exist_ok=True)
-    result_output_path = os.path.abspath(result_output_folder)  # ✅ 실제 경로 생성
-    
-    # 🔍 1단계 전: 텍스트 추출용 프레임 추출
-    print("\n📝 텍스트 추출용 프레임 분석 중...")
-    text_frame_paths = extract_key_frames_for_text(video_path, frame_output_folder, max_frames=10)
+    result_output_path = os.path.abspath(result_output_folder)
+
+    # 🔍 텍스트 추출용 프레임 분석
+    progress["step"] = "📝 텍스트 추출용 프레임 분석 중..."
+    progress["percent"] = 15
+    text_frame_paths = extract_key_frames_for_text(video_path, frame_output_folder, max_frames=6)
 
     if not text_frame_paths:
-        print("❌ 프레임 추출 실패")
+        progress["step"] = "❌ 텍스트 프레임 추출 실패"
+        progress["percent"] = 100
         return
-    
+
+    # 🔍 OCR 분석
+    progress["step"] = "🔍 텍스트 분석 중..."
+    progress["percent"] = 30
     ocr_result = analyze_images_in_folder(frame_output_path, result_output_path, frame_output_path)
-    print(ocr_result)
 
     if not ocr_result or not ocr_result.get('success'):
-        print("종료")
-        return  # 실패 시 종료
+        progress["step"] = "❌ 텍스트 분석 실패"
+        progress["percent"] = 100
+        return
 
     district = ocr_result.get('district')
     recorded_date = ocr_result.get('date')
 
-    # ⬇️ 다음 단계로 이동
-    print("📌 서울 지역으로 판단되어 분석을 계속 진행합니다.")
-
-    # 1단계: 영상 → 프레임 추출
-    print("\n📽️ 프레임 추출 중...")
-    os.makedirs(frame_output_folder, exist_ok=True)
+    # ✅ 본 분석 시작
+    progress["step"] = "📽️ 프레임 추출 중..."
+    progress["percent"] = 40
     extract_frames(video_path, frame_output_folder, seconds_between_frames=1)
-    
 
-    # 2단계: 이미지 → 예측 + Grad-CAM
-    print("\n🧠 이미지 분석 중...")
-    video_title = os.path.splitext(os.path.basename(video_path))[0]  # 전체 파일 이름 (확장자 제외)
+    # ✅ 이미지 예측
+    progress["step"] = "🧠 이미지 분석 중..."
+    progress["percent"] = 50
+    video_title = os.path.splitext(os.path.basename(video_path))[0]
+
+    # ✅ predict_images_in_folder 내부에서 percent 갱신 필요!
     predict_images_in_folder(frame_output_folder, result_output_folder, video_title)
 
-    # ✅ 프레임 폴더 삭제
+    # ✅ 분석 후
     try:
         shutil.rmtree(frame_output_folder)
-        print(f"🧹 프레임 폴더 삭제 완료: {frame_output_folder}")
     except Exception as e:
         print(f"⚠️ 프레임 폴더 삭제 중 오류 발생: {e}")
+
+    progress["step"] = "🗃️ 결과 이미지 저장 중..."
+    progress["percent"] = 95
     
-    #DB 삽입    
-    insert_analysis_results(
-        video_path=video_path,
-        result_dir=result_output_folder,
-        district=district,
-        recorded_date=recorded_date
-    )
+    #DB 삽입
+    #insert_analysis_results(
+    #    video_path=video_path,
+    #    result_dir=result_output_folder,
+    #    district=district,
+    #    recorded_date=recorded_date
+    #)
+    
+    meta_info = {
+        "video_path": video_path,
+        "district": district,
+        "recorded_date": recorded_date
+    }
+
+    meta_path = os.path.join(result_output_folder, "meta.json")
+    with open(meta_path, "w", encoding="utf-8") as f:
+        json.dump(meta_info, f, ensure_ascii=False, indent=2)
+
+    progress["step"] = "✅ 분석 완료!"
+    progress["percent"] = 100
+    progress["done"] = True  # ✅ 명시적 종료
+    
+    # ✅ 분석 결과를 static 폴더로 복사
+    static_results_dir = os.path.join("static", "results")
+    os.makedirs(static_results_dir, exist_ok=True)
+
+    # 예: Result/results_20250519_141239 → static/results/results_20250519_141239
+    timestamped_folder_name = os.path.basename(result_output_folder)
+    final_output_path = os.path.join(static_results_dir, timestamped_folder_name)
+
+    # 기존에 동일한 폴더가 있다면 제거
+    if os.path.exists(final_output_path):
+        shutil.rmtree(final_output_path)
+
+    shutil.copytree(result_output_folder, final_output_path)
 
     print(f"\n✅ 분석 완료! 결과 저장 위치: {os.path.abspath(result_output_folder)}")
     
