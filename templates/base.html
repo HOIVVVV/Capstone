@@ -72,8 +72,15 @@
     <div class="main">
       <!-- Topbar -->
       <div class="topbar">
-        <input type="text" placeholder="결과 검색..." style="width: 300px; padding: 6px;">
-        <span>시스템 소개</span>
+        <div style="display: flex; gap: 40px; font-size: 15px;">
+          <div>
+            📊 <strong>손상 이미지</strong>: <span id="damage-count">-</span>건
+          </div>
+          <div>
+            🎬 <strong>분석 영상</strong>: <span id="video-count">-</span>건
+          </div>
+        </div>
+        <span style="font-size: 14px; color: #444;">시스템 소개</span>
       </div>
 
       <!-- Content block -->
@@ -89,3 +96,18 @@
   </div>
 </body>
 </html>
+
+<script>
+  // 페이지 로드 시 손상 이미지 및 영상 개수 요청
+  window.addEventListener('DOMContentLoaded', () => {
+    fetch('/api/count_summary')
+      .then(res => res.json())
+      .then(data => {
+        document.getElementById('damage-count').textContent = data.damage_images;
+        document.getElementById('video-count').textContent = data.videos;
+      })
+      .catch(err => {
+        console.error("📛 개수 조회 실패:", err);
+      });
+  });
+</script>
