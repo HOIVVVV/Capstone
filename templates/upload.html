@@ -1,13 +1,268 @@
-<!DOCTYPE html>
-<html>
-<head>
-    <title>영상 업로드</title>
-</head>
-<body>
-    <h1>하수관 영상 업로드 및 프레임 추출</h1>
-    <form method="POST" action="/upload" enctype="multipart/form-data">
-        <input type="file" name="video" accept="video/*" required>
-        <button type="submit">업로드</button>
-    </form>
-</body>
-</html>
+{% extends "base.html" %}
+{% set active_page = 'upload' %}
+{% block title %}하수관로 손상 분석{% endblock %}
+
+{% block content %}
+<style>
+    #result-images {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 20px;
+    justify-content: center;
+  }
+</style>
+
+<!-- ✅ 전체 페이지 Wrapper (Column 방향) -->
+<div style="min-height: 85vh; display: flex; flex-direction: column; align-items: center; background: #f9f9f9; padding-top: 40px;">
+
+  <!-- 🔼 상단: 업로드 카드 + 영상 리스트 -->
+  <div style="display: flex; gap: 40px; justify-content: center;">
+
+    <!-- ⬅️ 업로드 카드 -->
+    <div class="card"
+         style="width: 450px; height: 550px; box-shadow: 0 4px 10px rgba(0, 0, 0, 0.1);
+                text-align: center; display: flex; flex-direction: column; justify-content: center; align-items: center;">
+      <h2 style="margin-bottom: 16px;">하수관로 손상 분석</h2>
+      <p class="text-muted" style="font-size: 16px; margin-bottom: 24px;">
+        하수관로 영상을 입력하거나<br>드래그하여 업로드하세요.
+      </p>
+
+      <!-- ✅ 진행 바 UI -->
+      <div id="progress-box" style="display: none; margin-bottom: 20px; width: 80%;">
+        <div id="progress-text" style="margin-bottom: 8px;">🔄 분석 준비 중...</div>
+        <div style="width: 100%; height: 20px; background-color: #eee; border-radius: 10px; overflow: hidden;">
+          <div id="progress-bar"
+               style="width: 0%; height: 100%; background-color: #007bff; transition: width 0.5s;"></div>
+        </div>
+      </div>
+
+      <!-- ✅ 업로드 input -->
+      <label style="border: 2px dashed #007bff; border-radius: 10px;
+              width: 80%; height: 200px;
+              display: flex; justify-content: center; align-items: center;
+              cursor: pointer; margin: auto;">
+        <input type="file" id="videoInput" accept="video/*" multiple
+              style="display: none;" onchange="handleFiles(this.files)">
+        <span style="font-size: 50px; color: #007bff;">+</span>
+      </label>
+
+      <!-- ✅ 분석 시작 버튼 -->
+      <button onclick="uploadVideo()"
+              style="margin-top: 20px; padding: 10px 20px;
+                    background-color: #007bff; color: white; border: none; border-radius: 5px;">
+        분석 시작
+      </button>
+    </div>
+
+    <!-- ➡️ 업로드된 영상 리스트 -->
+    <div class="card"
+         style="width: 300px; max-height: 550px; overflow-y: auto;
+                box-shadow: 0 4px 10px rgba(0, 0, 0, 0.1); text-align: center;">
+      <h4 style="margin: 16px 0;">업로드된 영상</h4>
+      <ul id="fileList" style="list-style: none; padding: 0 16px; text-align: left;"></ul>
+    </div>
+
+  </div>
+
+  <!-- 🔽 하단: 분석 결과 박스 (초기 비노출) -->
+  <div id="result-box" style="display: none; width: 100%; max-width: 1200px; padding: 40px 20px;">
+
+    <h4 style="margin-bottom: 20px; text-align: center;">📸 분석 결과</h4>
+
+    <!-- ✅ 결과 이미지 그리드 -->
+    <div id="result-grid"
+         style="display: grid; grid-template-columns: repeat(auto-fill, minmax(200px, 1fr));
+                gap: 20px; justify-items: center;">
+    </div>
+
+    <!-- ✅ 확인 버튼 -->
+    <div style="text-align: center; margin-top: 30px;">
+      <button onclick="confirmResults()"
+              style="padding: 10px 20px; background-color: #007bff; color: white;
+                     border: none; border-radius: 5px;">
+        ✔️ 확인
+      </button>
+    </div>
+
+  </div>
+
+</div>
+
+
+<!-- ✅ AJAX Upload + Progress Script -->
+<script>
+  let uploadedFiles = [];  // 사용자가 선택한 파일들 저장
+  let pollingActive = false;
+
+  function handleFiles(files) {
+  const fileList = document.getElementById('fileList');
+  uploadedFiles = [];  // 기존 파일 초기화
+  fileList.innerHTML = '';
+
+  for (const file of files) {
+    uploadedFiles.push(file);
+
+    // 🔄 파일 이름 + 크기 표시
+    const li = document.createElement('li');
+    li.textContent = `📁 ${file.name} (${(file.size / 1024 / 1024).toFixed(2)} MB)`;
+    li.style.marginBottom = '8px';
+    fileList.appendChild(li);
+  }
+
+  document.getElementById('videoInput').value = '';
+ }
+
+  function uploadVideo() {
+    if (pollingActive) return;
+    if (uploadedFiles.length === 0) {
+      alert("먼저 영상을 선택하세요.");
+      return;
+    }
+
+    pollingActive = true;
+
+    const box = document.getElementById("progress-box");
+    const text = document.getElementById("progress-text");
+    const bar = document.getElementById("progress-bar");
+
+    box.style.display = "block";
+    text.innerText = "🚀 영상 업로드 중...";
+    bar.style.width = "0%";
+
+    const formData = new FormData();
+    for (const file of uploadedFiles) {
+      formData.append("video", file);  // 다중이면 video[] 사용 가능
+    }
+
+    fetch("/upload", {
+      method: "POST",
+      body: formData
+    })
+    .then(res => res.json())
+    .then(result => {
+      if (result.success) {
+        pollProgress();
+      } else {
+        pollingActive = false;
+        text.innerText = "❌ 업로드 실패: " + result.message;
+      }
+    })
+    .catch(err => {
+      pollingActive = false;
+      text.innerText = "❌ 네트워크 오류 발생";
+      console.error(err);
+    });
+  }
+
+  function pollProgress() {
+    fetch("/progress")
+      .then(res => res.json())
+      .then(data => {
+        const text = document.getElementById("progress-text");
+        const bar = document.getElementById("progress-bar");
+
+        text.innerText = data.step;
+        bar.style.width = data.percent + "%";
+
+        if (data.done) {
+          text.innerText = "✅ 분석 완료!";
+          pollingActive = false;
+          uploadedFiles = [];  // 완료 후 파일 목록 초기화
+          document.getElementById('fileList').innerHTML = '';
+
+          fetch('/result_images')
+            .then(res => res.json())
+            .then(images => {
+              renderResults(images);
+              document.getElementById("result-box").style.display = "block";  // ✅ 분석 완료 후만 표시
+            });
+          return;
+        }
+        setTimeout(pollProgress, 1000);
+      });
+  }
+
+  function renderResults(images) {
+  const resultGrid = document.getElementById('result-grid');
+  resultGrid.innerHTML = '';
+
+  for (const imgPath of images) {
+    const label = extractLabelFromPath(imgPath);  // 예: Crack(95) 추출
+
+    const card = document.createElement('div');
+    card.style = `
+      width: 100%;
+      max-width: 200px;
+      border: 1px solid #ddd;
+      border-radius: 10px;
+      box-shadow: 0 2px 6px rgba(0,0,0,0.1);
+      padding: 10px;
+      background-color: white;
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+    `;
+
+    const img = document.createElement('img');
+    img.src = `/static/${imgPath}`;
+    img.style.width = "100%";
+    img.style.borderRadius = '6px';
+    img.style.marginBottom = '8px';
+    img.dataset.path = imgPath;
+
+    const caption = document.createElement('div');
+    caption.textContent = label;
+    caption.style = "font-size: 13px; margin-bottom: 10px; text-align: center; word-break: break-word;";
+
+    const delBtn = document.createElement('button');
+    delBtn.textContent = "삭제";
+    delBtn.style = "padding: 5px 10px; background-color: #dc3545; color: white; border: none; border-radius: 5px;";
+    delBtn.onclick = () => deleteImage(imgPath, card);
+
+    card.appendChild(img);
+    card.appendChild(caption);
+    card.appendChild(delBtn);
+
+    resultGrid.appendChild(card);
+  }
+
+  document.getElementById('result-box').style.display = 'block';
+}
+
+function extractLabelFromPath(path) {
+  const match = path.match(/_(.*?)\.(jpg|png)/);
+  return match ? match[1].replace(/_/g, ", ") : "분류 없음";
+}
+
+function deleteImage(path, wrapperElement) {
+  fetch('/delete_result_image', {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ path })
+  }).then(res => {
+    if (res.ok) {
+      wrapperElement.remove();
+    }
+  });
+}
+
+function confirmResults() {
+  const remainingPaths = Array.from(document.querySelectorAll('#result-grid img'))
+    .map(img => img.dataset.path)
+    .filter(Boolean);  // ✅ undefined 제거
+
+  fetch('/save_results_to_db', {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ images: remainingPaths })
+  }).then(res => {
+    if (res.ok) {
+      alert("✅ 결과가 저장되었습니다!");
+      document.getElementById("result-box").style.display = "none";
+    } else {
+      alert("❌ 저장 실패");
+    }
+  });
+}
+</script>
+{% endblock %}

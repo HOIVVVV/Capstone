@@ -75,3 +75,84 @@ def insert_analysis_results(video_path, result_dir, district, recorded_date, db_
         new_video.damage_image_count = damage_image_count
         db.session.commit()
         print(f"📊 최종 등록된 손상 이미지 수: {damage_image_count}")
+
+
+def insert_analysis_results_selected(image_paths, meta_path):
+    """
+    사용자가 최종 확인한 이미지 리스트(image_paths)만 DB에 저장.
+    image_paths: static 기준 상대 경로 리스트 (e.g. results/results_20250519_xxxx/영상폴더/파일.jpg)
+    meta_path: static 경로 내 meta.json 위치
+    """
+    if not image_paths:
+        print("❌ 저장할 이미지 없음")
+        return
+
+    if not os.path.exists(meta_path):
+        raise FileNotFoundError("meta.json 파일을 찾을 수 없습니다")
+
+    with open(meta_path, "r", encoding="utf-8") as f:
+        meta = json.load(f)
+
+    from db.models import db, Video, DamageImage
+    from flask import Flask
+
+    app = Flask(__name__)
+    app.config['SQLALCHEMY_DATABASE_URI'] = 'mysql+pymysql://root:1234@localhost/capstone'
+    app.config['SQLALCHEMY_TRACK_MODIFICATIONS'] = False
+    db.init_app(app)
+
+    with app.app_context():
+        db.create_all()
+
+        video_title = os.path.basename(meta["video_path"])
+        recorded_date = meta.get("recorded_date")
+        district = meta.get("district")
+
+        new_video = Video(
+            title=video_title,
+            location=district,
+            recorded_date=recorded_date if recorded_date != "날짜 추출 안됨" else None
+        )
+        db.session.add(new_video)
+        db.session.commit()
+
+        damage_image_count = 0
+
+        for rel_path in image_paths:
+            try:
+                # ✅ 슬래시 통일
+                rel_path = rel_path.replace("\\", "/")
+                abs_path = os.path.join("Result", *rel_path.split("/")[1:])
+
+                file_name = os.path.basename(abs_path)
+                image_title = os.path.splitext(file_name)[0]
+
+                parts = [p for p in image_title.split('_') if p.strip()]
+                timeline_str = next((p for p in parts if re.match(r"^f\d+$", p)), None)
+                if not timeline_str:
+                    raise ValueError("프레임 태그 f### 없음")
+
+                seconds = int(timeline_str[1:])
+                timecode = (datetime.min + timedelta(seconds=seconds)).time()
+
+                damage_info_str = image_title.split(f"{timeline_str}_")[-1]
+                damage_type = damage_info_str.split(',')[0].split('(')[0]
+
+                damage_image = DamageImage(
+                    video_id=new_video.video_id,
+                    image_title=image_title,
+                    damage_type=damage_type,
+                    timeline=timecode,
+                    image_path=os.path.abspath(abs_path)
+                )
+                db.session.add(damage_image)
+                damage_image_count += 1
+
+            except Exception as e:
+                print(f"❌ 이미지 분석 실패: {rel_path} → {e}")
+                continue
+
+        new_video.damage_image_count = damage_image_count
+        db.session.commit()
+
+        print(f"✅ 선택된 이미지 {damage_image_count}개 저장 완료")

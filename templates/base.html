@@ -1,0 +1,113 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+  <meta charset="UTF-8">
+  <title>{% block title %}하수관로 관리 시스템{% endblock %}</title>
+  <style>
+    body { margin: 0; font-family: 'Noto Sans KR', sans-serif; background: #f9f9f9; }
+    .layout { display: flex; height: 100vh; }
+    .sidebar {
+      width: 220px;
+      background: linear-gradient(to bottom, #d32f2f, #b71c1c);
+      color: white;
+      padding: 20px;
+    }
+    .sidebar h2 { margin-top: 0; font-size: 18px; }
+    .sidebar ul { list-style: none; padding: 0; margin-top: 40px; }
+    .sidebar li { padding: 10px 0; cursor: pointer; }
+    .sidebar li:hover, .sidebar .active { font-weight: bold; color: #ffd700; }
+
+    .main { flex: 1; display: flex; flex-direction: column; }
+    .topbar {
+      height: 60px;
+      background: #fff;
+      border-bottom: 1px solid #ddd;
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      padding: 0 20px;
+    }
+    .footer {
+      height: 40px;
+      background: #fff;
+      border-top: 1px solid #ddd;
+      text-align: center;
+      padding: 10px;
+      font-size: 13px;
+      color: #777;
+    }
+    .content {
+      flex: 1;
+      padding: 20px;
+      background: #f9f9f9;
+      overflow-y: auto;
+    }
+  </style>
+</head>
+<body>
+  <div class="layout">
+    <!-- Sidebar -->
+    <div class="sidebar">
+      <h2>하수관로 관리 시스템</h2>
+      <ul>
+        <li {% if active_page == 'dashboard' %}class="active"{% endif %}>
+            <a href="/" style="color: inherit; text-decoration: none;">대시보드</a>
+        </li>
+        <li {% if active_page == 'result' %}class="active"{% endif %}>
+            <a href="/result" style="color: inherit; text-decoration: none;">관로 점검 결과</a>
+        </li>
+        <li {% if active_page == 'stats' %}class="active"{% endif %}>
+            <a href="/stats" style="color: inherit; text-decoration: none;">손상 통계</a>
+        </li>
+        <li {% if active_page == 'map' %}class="active"{% endif %}>
+            <a href="/map" style="color: inherit; text-decoration: none;">손상도 매핑</a>
+        </li>
+        <li {% if active_page == 'upload' %}class="active"{% endif %}>
+            <a href="/upload" style="color: inherit; text-decoration: none;">하수관로 손상 분석</a>
+        </li>
+        </ul>
+    </div>
+
+    <!-- Main -->
+    <div class="main">
+      <!-- Topbar -->
+      <div class="topbar">
+        <div style="display: flex; gap: 40px; font-size: 15px;">
+          <div>
+            📊 <strong>손상 이미지</strong>: <span id="damage-count">-</span>건
+          </div>
+          <div>
+            🎬 <strong>분석 영상</strong>: <span id="video-count">-</span>건
+          </div>
+        </div>
+        <span style="font-size: 14px; color: #444;">시스템 소개</span>
+      </div>
+
+      <!-- Content block -->
+      <div class="content">
+        {% block content %}{% endblock %}
+      </div>
+
+      <!-- Footer -->
+      <div class="footer">
+        © 2025 <a href="http://sejong.ac.kr" target="_blank">Sejong University</a> Capstone Team 6
+      </div>
+    </div>
+  </div>
+</body>
+</html>
+
+<script>
+  // 페이지 로드 시 손상 이미지 및 영상 개수 요청
+  window.addEventListener('DOMContentLoaded', () => {
+    fetch('/api/count_summary')
+      .then(res => res.json())
+      .then(data => {
+        document.getElementById('damage-count').textContent = data.damage_images;
+        document.getElementById('video-count').textContent = data.videos;
+      })
+      .catch(err => {
+        console.error("📛 개수 조회 실패:", err);
+      });
+  });
+</script>
