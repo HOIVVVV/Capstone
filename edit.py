@@ -113,11 +113,23 @@ def generate_chart():
     all_locations = db.session.query(Video.location).distinct().all()
     damage_types = [d[0] for d in all_damage_types]
     locations = [l[0] for l in all_locations]
-    min_date = df['recorded_date'].min().strftime('%Y-%m-%d')
-    max_date = df['recorded_date'].max().strftime('%Y-%m-%d')
+    # min_date = df['recorded_date'].min().strftime('%Y-%m-%d')
+    # max_date = df['recorded_date'].max().strftime('%Y-%m-%d')
+    min_date = start_date
+    max_date = end_date
 
     if df.empty:
-        return '선택된 조건에 맞는 데이터가 없습니다.'
+        return render_template(path, chart_html="<p style='text-align:center;'>선택된 조건에 맞는 데이터가 없습니다.</p>",
+                           start_date=start_date,
+                           end_date=end_date,
+                           selected_damage_types=selected_damage_types,
+                           selected_locations=selected_locations,
+                           damage_types=damage_types,
+                           locations=locations,
+                           min_date=min_date,
+                           max_date=max_date,
+                           chart_type=chart_type)
+
 
     fig, ax = plt.subplots(figsize=(12, 6))
 
@@ -450,20 +462,79 @@ def generate_chart():
                                max_date=max_date,
                                chart_type=chart_type)
 
-
-
-    else:
-        return '그래프 종류를 선택해주세요.'
-
-    img = BytesIO()
-    plt.tight_layout()
-    plt.savefig(img, format='png')
-    img.seek(0)
-    return send_file(img, mimetype='image/png')
+# @app.route('/front')
+# def front_page():
+#     return render_template('front.html')
 
 @app.route('/front')
 def front_page():
-    return render_template('front.html')
+    chart_type = request.form.get('chart_type')
+    selected_damage_types = request.form.getlist('damage_type')
+    selected_locations = request.form.getlist('location')
+    aggregate_unit = request.form.get('aggregate_unit')
+    start_date = request.form.get('start_date')
+    end_date = request.form.get('end_date')
+
+    query = db.session.query(Video.recorded_date, Video.location, DamageImage.damage_type).join(DamageImage)
+
+    if selected_damage_types:
+        query = query.filter(DamageImage.damage_type.in_(selected_damage_types))
+    if selected_locations:
+        query = query.filter(Video.location.in_(selected_locations))
+
+    # ✅ 날짜 범위 필터링
+    if start_date:
+        query = query.filter(Video.recorded_date >= start_date)
+    if end_date:
+        query = query.filter(Video.recorded_date <= end_date)
+
+    results = query.all()
+    data = [{'recorded_date': rec, 'location': loc, 'damage_type': dtype} for rec, loc, dtype in results]
+    df = pd.DataFrame(data)
+    
+    # ✅ 전체 선택 옵션 제공을 위해 전체 리스트도 다시 전달
+    # damage_types = df['damage_type'].unique().tolist()
+    # locations = df['location'].unique().tolist()
+    # ✅ 전체 손상 유형과 위치 가져오기
+    all_damage_types = db.session.query(DamageImage.damage_type).distinct().all()
+    all_locations = db.session.query(Video.location).distinct().all()
+    damage_types = [d[0] for d in all_damage_types]
+    locations = [l[0] for l in all_locations]
+    min_date = df['recorded_date'].min().strftime('%Y-%m-%d')
+    max_date = df['recorded_date'].max().strftime('%Y-%m-%d')
+    has_locations = bool(selected_locations)
+    has_damage_types = bool(selected_damage_types)
+    
+    #pieChart -> 손상유형통계
+    summary = df['damage_type'].value_counts().reset_index()
+    summary.columns = ['damage_type', 'count']
+    fig1 = px.pie(summary, values='count', names='damage_type', title='손상 유형 분포', hole=0.3)
+    chart_html1 = fig1.to_html(full_html=False)
+    
+    #stacked -> 지역별 손상빈도
+    pivot = df.groupby(['location', 'damage_type']).size().unstack(fill_value=0)
+    fig2 = go.Figure()
+
+    for damage_type in pivot.columns:
+        fig2.add_trace(go.Bar(
+            x=pivot.index,
+            y=pivot[damage_type],
+            name=damage_type
+        ))
+
+    fig2.update_layout(
+        barmode='stack',
+        title='Stacked Bar Chart',
+        xaxis_title='위치',
+        yaxis_title='건수'
+    )
+
+    chart_html2 = fig2.to_html(full_html=False)
+    return render_template('front.html', chart_html1=chart_html1,
+                           chart_html2=chart_html2)
+    
+    
+
 
 
 
