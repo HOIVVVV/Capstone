@@ -81,14 +81,11 @@ def predict_image(image_path, save_path, video_title, frame_number):
     top3_probs_vals = top3_probs[0].tolist()
 
     non_damage_labels = [
-        "2-1.이음부(Pipe-Joint,PJ)",
         "2-2.하수관로_내부(Inside,IN)",
-        "2-3-1.하수관로_외부_맨홀",
-        "2-3-2.하수관로_외부_인버트",
-        "2-3-3.하수관로_외부_자동차"
+        "2-3-1.하수관로_외부",
     ]
 
-    if top3_probs_vals[0] >= 0.65:
+    if top3_probs_vals[0] >= 0.5:
         damage_detected = top3_labels[0] not in non_damage_labels
     else:
         damage_detected = any(label not in non_damage_labels for label in top3_labels)

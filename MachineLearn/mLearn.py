@@ -203,7 +203,7 @@ def main():
     ])
 
 
-    dataset_root = "테스트데이터"#"C:/Users/parkerpark/Downloads/학습 동일 소형 데이터"
+    dataset_root = "C:/Users/parkerpark/Downloads/학습 데이터 추가"
     corrupted_txt_path = "corrupted.txt"
     dataset = FolderBasedDataset(dataset_root, corrupted_txt_path=corrupted_txt_path)
     class_map = dataset.class_map
