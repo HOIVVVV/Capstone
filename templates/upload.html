@@ -1,13 +1,96 @@
-<!DOCTYPE html>
-<html>
-<head>
-    <title>영상 업로드</title>
-</head>
-<body>
-    <h1>하수관 영상 업로드 및 프레임 추출</h1>
-    <form method="POST" action="/upload" enctype="multipart/form-data">
-        <input type="file" name="video" accept="video/*" required>
-        <button type="submit">업로드</button>
-    </form>
-</body>
-</html>
+{% extends "base.html" %}
+{% set active_page = 'upload' %}
+{% block title %}하수관로 손상 분석{% endblock %}
+
+{% block content %}
+<div style="min-height: 85vh; display: flex; justify-content: center; align-items: center; background: #f9f9f9;">
+  <div style="display: flex; gap: 40px;">
+
+    <!-- ⬅️ 업로드 카드 -->
+    <div class="card"
+         style="width: 450px; height: 550px; box-shadow: 0 4px 10px rgba(0, 0, 0, 0.1);
+                text-align: center; display: flex; flex-direction: column; justify-content: center; align-items: center;">
+      <h2 style="margin-bottom: 16px;">하수관로 손상 분석</h2>
+      <p class="text-muted" style="font-size: 16px; margin-bottom: 24px;">
+        하수관로 영상을 입력하거나<br>드래그하여 업로드하세요.
+      </p>
+
+      <!-- 진행 바 영역 (📌 추가됨) -->
+      <div id="progress-box" style="display: none; margin-bottom: 20px; width: 80%;">
+        <div id="progress-text" style="margin-bottom: 8px;">🔄 분석 준비 중...</div>
+        <div style="width: 100%; height: 20px; background-color: #eee; border-radius: 10px; overflow: hidden;">
+          <div id="progress-bar"
+               style="width: 0%; height: 100%; background-color: #007bff; transition: width 0.5s;"></div>
+        </div>
+      </div>
+
+      <!-- 업로드 폼 -->
+      <form method="POST" action="{{ url_for('main.upload_video') }}" enctype="multipart/form-data" style="width: 100%;">
+        {% if error %}
+          <p style="color: red;">{{ error }}</p>
+        {% endif %}
+        {% if uploaded_filename %}
+          <p style="color: green;">✅ 분석 완료: {{ uploaded_filename }}</p>
+        {% endif %}
+
+        <label style="border: 2px dashed #007bff; border-radius: 10px;
+                      width: 80%; height: 200px;
+                      display: flex; justify-content: center; align-items: center;
+                      cursor: pointer; margin: auto;">
+          <input type="file" name="video" accept="video/*"
+                 style="display: none;" onchange="startAnalysis(); this.form.submit();">
+          <span style="font-size: 50px; color: #007bff;">+</span>
+        </label>
+      </form>
+    </div>
+
+    <!-- ➡️ 업로드 리스트 -->
+    <div class="card"
+         style="width: 300px; height: 550px; overflow-y: auto;
+                box-shadow: 0 4px 10px rgba(0, 0, 0, 0.1); text-align: center;">
+      <h4 style="margin-bottom: 16px;">업로드된 영상</h4>
+
+      {% if uploaded_filename %}
+        <ul style="padding-left: 0; list-style: none; text-align: left; margin: 0 20px;">
+          <li style="padding: 10px 0; border-bottom: 1px solid #eee;">
+            <span style="display: inline-block; max-width: 180px;
+                         white-space: nowrap; overflow: hidden; text-overflow: ellipsis;">
+              {{ uploaded_filename }}
+            </span>
+            <span style="float: right; background: #007bff; color: white; padding: 4px 8px; border-radius: 10px;">
+              ✅
+            </span>
+          </li>
+        </ul>
+      {% else %}
+        <p class="text-muted" style="margin-top: 120px;">아직 업로드된 영상이 없습니다.</p>
+      {% endif %}
+    </div>
+
+  </div>
+</div>
+
+<!-- 📌 스크립트 추가 -->
+<script>
+  function pollProgress() {
+    fetch("/progress")
+      .then(res => res.json())
+      .then(data => {
+        document.getElementById("progress-box").style.display = "block";
+        document.getElementById("progress-text").innerText = data.step;
+        document.getElementById("progress-bar").style.width = data.percent + "%";
+
+        if (data.percent < 100) {
+          setTimeout(pollProgress, 1000);
+        } else {
+          document.getElementById("progress-text").innerText = "✅ 분석 완료!";
+        }
+      });
+  }
+
+  function startAnalysis() {
+    document.getElementById("progress-box").style.display = "block";
+    pollProgress();
+  }
+</script>
+{% endblock %}

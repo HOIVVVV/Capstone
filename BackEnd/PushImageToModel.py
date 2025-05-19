@@ -1,13 +1,16 @@
 import os
+import sys
 import json
 import torch
 import cv2
 import numpy as np
 import torchvision.transforms.v2 as transforms_v2  # PyTorch >=2.0
 import torchvision.transforms as transforms
+sys.path.append(os.path.abspath(os.path.dirname(__file__)))
 from PIL import Image
 from torchvision.models import resnext50_32x4d, ResNeXt50_32X4D_Weights
 from Grad_cam import GradCAM
+from progress import progress
 
 # ✅ 클래스 맵 로딩 (index → 라벨명)
 def load_class_map(path):
@@ -21,7 +24,8 @@ device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
 weights = ResNeXt50_32X4D_Weights.DEFAULT
 model = resnext50_32x4d(weights=weights)
 
-class_map = load_class_map("class_map.json")
+#모델 클래스 로드드
+class_map = load_class_map("class_map2.json")
 num_classes = max(class_map.keys()) + 1
 model.fc = torch.nn.Linear(model.fc.in_features, num_classes)
 
@@ -55,14 +59,25 @@ transform = transforms_v2.Compose([
                             std=[0.229, 0.224, 0.225])
     ])
 
-def predict_images_in_folder(folder_path, save_base_path):
-    for idx, filename in enumerate(sorted(os.listdir(folder_path))):
-        if filename.lower().endswith(('.png', '.jpg', '.jpeg')):
-            image_path = os.path.join(folder_path, filename)
-            video_title = os.path.basename(folder_path).split('_')[-1]
-            save_path = os.path.join(save_base_path, video_title)
-            os.makedirs(save_path, exist_ok=True)
-            predict_image(image_path, save_path, video_title, idx + 1)
+def predict_images_in_folder(folder_path, save_base_path, video_title):
+    image_files = [f for f in sorted(os.listdir(folder_path)) if f.lower().endswith(('.png', '.jpg', '.jpeg'))]
+    total = len(image_files)
+
+    for idx, filename in enumerate(image_files):
+        percent = int((idx + 1) / total * 100)
+        progress["percent"] = percent
+        progress["step"] = f"이미지 분석 중... ({idx + 1}/{total})"
+        progress["current_file"] = filename
+
+        image_path = os.path.join(folder_path, filename)
+        save_path = os.path.join(save_base_path, video_title)  # ✅ 정확한 영상 제목 폴더로 저장
+        os.makedirs(save_path, exist_ok=True)
+
+        predict_image(image_path, save_path, video_title, idx + 1)
+
+    progress["percent"] = 100
+    progress["step"] = "✅ 이미지 분석 완료"
+
 
 def predict_image(image_path, save_path, video_title, frame_number):
     original_image = Image.open(image_path).convert("RGB")

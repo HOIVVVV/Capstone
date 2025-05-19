@@ -1,0 +1,79 @@
+<!DOCTYPE html>
+<html>
+<head>
+    <title>손상 통계 시각화</title>
+    <script>
+        function onChartTypeChange() {
+            const chartType = document.querySelector("select[name='chart_type']").value;
+            const defaultFilters = document.getElementById("default-filters");
+            const lineOptionSelector = document.getElementById("line-option-selector");
+
+            if (chartType === 'line') {
+                defaultFilters.style.display = 'none';
+                lineOptionSelector.style.display = 'block';
+            } else {
+                defaultFilters.style.display = 'block';
+                lineOptionSelector.style.display = 'none';
+            }
+        }
+
+        window.onload = onChartTypeChange;
+    </script>
+</head>
+<body>
+    <h1>손상 통계 시각화</h1>
+    <form method="POST" action="/generate_chart">
+
+        <!-- ✅ 날짜 범위 선택 -->
+        <label>시작 날짜:</label>
+        <input type="date" name="start_date" required>
+        <label>종료 날짜:</label>
+        <input type="date" name="end_date" required><br><br>
+
+        <!-- ✅ 그래프 종류 선택 -->
+        <label>그래프 종류 선택:</label>
+        <select name="chart_type" onchange="onChartTypeChange()">
+            <option value="bar">Bar 그래프</option>
+            <option value="pie">Pie 차트</option>
+            <option value="line">Line 차트</option>
+            <option value="heatmap">Heatmap 차트</option>
+            <option value="stacked">Stacked 차트</option>
+        </select><br><br>
+
+        <!-- ✅ line 차트 전용 옵션 -->
+        <div id="line-option-selector" style="display:none;">
+            <label>집계 단위:</label>
+            <select name="aggregate_unit">
+                <option value="month">월별</option>
+                <option value="quarter">분기별</option>
+            </select><br><br>
+
+            <label>손상 유형</label><br>
+            {% for dtype in damage_types %}
+                <input type="checkbox" name="damage_type" value="{{ dtype }}">{{ dtype }}<br>
+            {% endfor %}
+
+            <label>촬영 위치</label><br>
+            {% for loc in locations %}
+                <input type="checkbox" name="location" value="{{ loc }}">{{ loc }}<br>
+            {% endfor %}
+        </div>
+
+        <!-- ✅ 기본 필터 (bar, pie, heatmap, stacked용) -->
+        <div id="default-filters">
+            <label>손상 유형</label><br>
+            {% for dtype in damage_types %}
+                <input type="checkbox" name="damage_type" value="{{ dtype }}">{{ dtype }}<br>
+            {% endfor %}
+
+            <label>촬영 위치</label><br>
+            {% for loc in locations %}
+                <input type="checkbox" name="location" value="{{ loc }}">{{ loc }}<br>
+            {% endfor %}
+        </div>
+
+        <br>
+        <input type="submit" value="그래프 생성">
+    </form>
+</body>
+</html>
