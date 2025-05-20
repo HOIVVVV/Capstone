@@ -81,10 +81,10 @@
               <div class="chart-result" >
                 <h5 class="card-title">손상 유형 통계</h5>
                 {% if chart_html1 %}
-                {{ chart_html1|safe }}
-              {% else %}
-                <p style="text-align: center; line-height: 470px; color: #999;">그래프가 여기에 표시됩니다.</p>
-              {% endif %}
+                  {{ chart_html1|safe }}
+                {% else %}
+                  <p style="text-align: center; line-height: 470px; color: #999;">그래프가 여기에 표시됩니다.</p>
+                {% endif %}
 
               </div>
             </div>
@@ -95,21 +95,23 @@
               <div class="chart-result">
                 <h5 class="card-title">지역별 손상 빈도</h5>
                 {% if chart_html2 %}
-                {{ chart_html2|safe }}
-              {% else %}
-                <p style="text-align: center; line-height: 470px; color: #999;">그래프가 여기에 표시됩니다.</p>
-              {% endif %}
+                  {{ chart_html2|safe }}
+                {% else %}
+                  <p style="text-align: center; line-height: 470px; color: #999;">그래프가 여기에 표시됩니다.</p>
+                {% endif %}
               </div>
             </div>
           </div>
 
           <div class="col-md-6 mb-4">
             <div class="card">
-              <div class="card-body">
+              <div class="chart-result">
                 <h5 class="card-title">손상 발생 빈도</h5>
-                <p class="card-subtitle text-muted">월별 통계</p>
-                <p class="mt-4 text-muted small">🔴 손상 건수</p>
-                <p class="text-muted small">✔ 데이터 검증 완료</p>
+                {% if chart_html3 %}
+                  {{ chart_html3|safe }}
+                {% else %}
+                  <p style="text-align: center; line-height: 470px; color: #999;">그래프가 여기에 표시됩니다.</p>
+                {% endif %}
               </div>
             </div>
           </div>
