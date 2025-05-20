@@ -256,15 +256,13 @@
 
 function extractLabelFromPath(path) {
   const classMap = {
-    "1-1.균열(Crack,CL)": 0,
-    "1-2.표면손상(Surface-Damage,SD)": 1,
-    "1-3.파손(Broken-Pipe,BK)": 2,
-    "1-4.연결관-돌출(Lateral-Protruding,LP)": 3,
-    "1-5.이음부-손상(Joint-Faulty,JF)": 4,
-    "1-6.토사퇴적(Deposits-Silty,DS)": 5,
-    "1-7.기타결함(Etc.,ETC)": 6,
-    "2-1.관로_내부(Inside,IN)": 7,
-    "2-2.관로_외부": 8
+    "1-1.균열(Crack,CL),파손(Broken-Pipe,BK)": 0,
+    "1-2.표면손상(Surface-Damage,SD),토사퇴적(Deposits-Silty,DS)": 1,
+    "1-3.연결관-돌출(Lateral-Protruding,LP)": 2,
+    "1-4.이음부-손상(Joint-Faulty,JF)": 3,
+    "1-5.기타결함(Etc.,ETC)": 4,
+    "2-1.관로_내부(Inside,IN)": 5,
+    "2-2.관로_외부": 6
   };
 
   // ▶ ".뒤" 이름만 추출 (ex. "균열(Crack,CL)")

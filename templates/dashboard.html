@@ -46,39 +46,37 @@
     </div>
 
     <!-- 검사 결과 요약 -->
-    <div class="card" style="flex: 1;">
-      <h3>검사 결과 요약</h3>
-      <p class="text-muted">최근 하수관로 검사 기록</p>
-      <table style="width: 100%; border-collapse: collapse;">
-        <thead>
-          <tr style="text-align: left; border-bottom: 1px solid #ccc;">
-            <th>구간</th>
-            <th>손상 상태</th>
-            <th>보기</th>
-          </tr>
-        </thead>
-        <tbody>
-          <tr>
-            <td>구간 A</td>
-            <td>손상 감지 (균열)</td>
-            <td><button>🔍</button></td>
-          </tr>
-          <tr>
-            <td>구간 B</td>
-            <td>정상</td>
-            <td><button>🔍</button></td>
-          </tr>
-          <tr>
-            <td>구간 C</td>
-            <td>파손 심각</td>
-            <td><button>🔍</button></td>
-          </tr>
-        </tbody>
-      </table>
-      <p style="font-size: 12px; margin-top: 10px;">
-        <i class="fa fa-history"></i> 3분 전 업데이트
-      </p>
-    </div>
+  <div class="card" style="flex: 1;">
+    <h3>검사 결과 요약</h3>
+    <p class="text-muted">최근 하수관로 검사 기록</p>
+    <table style="width: 100%; border-collapse: collapse;">
+      <thead>
+        <tr style="text-align: left; border-bottom: 1px solid #ccc;">
+          <th>시간</th>
+          <th>손상 상태</th>
+          <th>보기</th>
+        </tr>
+      </thead>
+      <tbody>
+        {% for item in image_results %}
+        <tr>
+          <td>{{ item.time }}</td>
+          <td>{{ item.label }}</td>
+          <td>
+            <a href="/static/{{ item.file }}" target="_blank">
+              <button>🔍</button>
+            </a>
+          </td>
+        </tr>
+        {% endfor %}
+        {% if image_results|length == 0 %}
+        <tr><td colspan="3">최근 손상 이미지가 없습니다.</td></tr>
+        {% endif %}
+      </tbody>
+    </table>
+    <p style="font-size: 12px; margin-top: 10px;">
+      <i class="fa fa-history"></i> 최신 기준
+    </p>
   </div>
-</div>
+
 {% endblock %}

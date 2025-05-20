@@ -19,7 +19,7 @@ def analyze_video(video_path):
         return
 
     # ✅ 기존 static 결과 삭제
-    static_results_dir = os.path.join("static", "results")
+    static_results_dir = os.path.join("static", "predictResults")
     if os.path.exists(static_results_dir):
         shutil.rmtree(static_results_dir)
     os.makedirs(static_results_dir, exist_ok=True)
@@ -32,9 +32,12 @@ def analyze_video(video_path):
     frame_output_path = os.path.abspath(frame_output_folder)
     os.makedirs(frame_output_path, exist_ok=True)
 
-    result_root = "Result"
+    result_root = os.path.join("static", "results")  # static/results
+    os.makedirs(result_root, exist_ok=True)
+
     result_output_folder = os.path.join(result_root, f"results_{timestamp}")
     os.makedirs(result_output_folder, exist_ok=True)
+
     result_output_path = os.path.abspath(result_output_folder)
 
     # 🔍 텍스트 추출용 프레임 분석
@@ -69,6 +72,7 @@ def analyze_video(video_path):
     progress["step"] = "🧠 이미지 분석 중..."
     progress["percent"] = 50
     video_title = os.path.splitext(os.path.basename(video_path))[0]
+    print(f"🎥 video_title 추출: {video_title}")
 
     # ✅ predict_images_in_folder 내부에서 percent 갱신 필요!
     predict_images_in_folder(frame_output_folder, result_output_folder, video_title)
@@ -113,18 +117,24 @@ def analyze_video(video_path):
     progress["done"] = True  # ✅ 명시적 종료
     
     # ✅ 분석 결과를 static 폴더로 복사
-    static_results_dir = os.path.join("static", "results")
+    static_results_dir = os.path.join("static", "predictResults")
     os.makedirs(static_results_dir, exist_ok=True)
 
-    # 예: Result/results_20250519_141239 → static/results/results_20250519_141239
     timestamped_folder_name = os.path.basename(result_output_folder)
     final_output_path = os.path.join(static_results_dir, timestamped_folder_name)
 
-    # 기존에 동일한 폴더가 있다면 제거
     if os.path.exists(final_output_path):
         shutil.rmtree(final_output_path)
-
     shutil.copytree(result_output_folder, final_output_path)
+
+    print(f"\n✅ 분석 완료! 결과 저장 위치: {os.path.abspath(result_output_folder)}")
+
+    # ✅ 결과 복사 후, result_output_folder 삭제 (DB에 저장 전임)
+    try:
+        shutil.rmtree(result_output_folder)
+        print(f"🧹 static/results 내부 분석 결과 삭제됨: {result_output_folder}")
+    except Exception as e:
+        print(f"⚠️ static/results 분석 결과 삭제 실패: {e}")
 
     print(f"\n✅ 분석 완료! 결과 저장 위치: {os.path.abspath(result_output_folder)}")
     

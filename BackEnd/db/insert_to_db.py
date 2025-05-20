@@ -122,9 +122,7 @@ def insert_analysis_results_selected(image_paths, meta_path):
             try:
                 # ✅ 슬래시 통일
                 rel_path = rel_path.replace("\\", "/")
-                abs_path = os.path.join("Result", *rel_path.split("/")[1:])
-
-                file_name = os.path.basename(abs_path)
+                file_name = os.path.basename(rel_path)
                 image_title = os.path.splitext(file_name)[0]
 
                 parts = [p for p in image_title.split('_') if p.strip()]
@@ -143,7 +141,7 @@ def insert_analysis_results_selected(image_paths, meta_path):
                     image_title=image_title,
                     damage_type=damage_type,
                     timeline=timecode,
-                    image_path=os.path.abspath(abs_path)
+                    image_path=rel_path  # ✅ 상대 경로로 저장
                 )
                 db.session.add(damage_image)
                 damage_image_count += 1

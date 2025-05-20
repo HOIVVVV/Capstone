@@ -3,6 +3,7 @@ import sys
 import json
 import torch
 import cv2
+import re
 import numpy as np
 import torchvision.transforms.v2 as transforms_v2  # PyTorch >=2.0
 import torchvision.transforms as transforms
@@ -25,7 +26,7 @@ weights = ResNeXt50_32X4D_Weights.DEFAULT
 model = resnext50_32x4d(weights=weights)
 
 #모델 클래스 로드드
-class_map = load_class_map("class_map.json")
+class_map = load_class_map("class_map_final.json")
 num_classes = max(class_map.keys()) + 1
 model.fc = torch.nn.Linear(model.fc.in_features, num_classes)
 
@@ -58,6 +59,7 @@ transform = transforms_v2.Compose([
         transforms_v2.Normalize(mean=[0.485, 0.456, 0.406],
                             std=[0.229, 0.224, 0.225])
     ])
+
 
 def predict_images_in_folder(folder_path, save_base_path, video_title):
     image_files = [f for f in sorted(os.listdir(folder_path)) if f.lower().endswith(('.png', '.jpg', '.jpeg'))]

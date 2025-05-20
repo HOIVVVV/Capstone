@@ -112,5 +112,5 @@ if __name__ == "__main__":
     test_with_images(
         data_root="학습데이터/원천데이터",  # ← 클래스별 폴더 구조로 되어 있어야 함
         model_path="resnext_model_1.pth",
-        class_map_path="class_map.json"
+        class_map_path="class_map_final.json"
     )

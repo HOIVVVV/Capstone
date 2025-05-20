@@ -25,7 +25,7 @@ from sklearn.model_selection import StratifiedShuffleSplit
 ImageFile.LOAD_TRUNCATED_IMAGES = True
 
 # Load fixed class map from JSON
-CLASS_MAP_PATH = "class_map.json"
+CLASS_MAP_PATH = "class_map_final.json"
 if os.path.exists(CLASS_MAP_PATH):
     with open(CLASS_MAP_PATH, "r", encoding="utf-8") as f:
         FIXED_CLASS_MAP = json.load(f)
@@ -348,7 +348,7 @@ def main():
 
     with open(CLASS_MAP_PATH, "w", encoding="utf-8") as f:
         json.dump(class_map, f, indent=4, ensure_ascii=False)
-    print("✅ 클래스 맵 저장 완료: class_map.json")
+    print("✅ 클래스 맵 저장 완료: class_map_final.json")
 
 
 if __name__ == "__main__":

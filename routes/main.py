@@ -1,6 +1,7 @@
 # routes/main.py
 import os
 import sys
+import re
 sys.path.append(os.path.abspath(os.path.dirname(__file__)))
 from flask import Blueprint, render_template, request, current_app
 from flask import Blueprint, request, jsonify, current_app
@@ -12,10 +13,25 @@ from BackEnd.db.models import db, DamageImage, Video  # 모델 경로에 맞게 
 
 main = Blueprint('main', __name__)
 
-#메인 데시보드 페이지지
-@main.route("/")
+@main.route('/')
 def dashboard():
-    return render_template("dashboard.html", active_page="dashboard")
+    # ✅ image_id 기준으로 최신 이미지 3개 가져오기
+    recent_images = (
+        DamageImage.query
+        .order_by(DamageImage.image_id.desc())  # 최신 ID 순
+        .limit(3)
+        .all()
+    )
+
+    image_results = []
+    for img in recent_images:
+        image_results.append({
+            "time": img.timeline.strftime("%H:%M:%S") if img.timeline else "시간 없음",
+            "label": img.damage_type or "손상 없음",
+            "file": img.image_path.replace("static/", "")  # 템플릿에서는 static/ 제외
+        })
+
+    return render_template("dashboard.html", image_results=image_results)
 
 @main.route("/stats")
 def stats():
@@ -70,6 +86,12 @@ def upload_page():
 #영상 업로드
 @main.route("/upload", methods=["POST"])
 def upload_video():
+    def korean_safe_filename(filename):
+        name, ext = os.path.splitext(filename)
+        name = re.sub(r'[^\w가-힣\s-]', '', name)      # 한글, 영문, 숫자, 공백, 하이픈만 허용
+        name = re.sub(r'\s+', '_', name)              # 공백은 언더스코어로
+        return name + ext
+
     if 'video' not in request.files and 'video[]' not in request.files:
         return jsonify({'success': False, 'message': 'No video provided'})
 
@@ -78,7 +100,7 @@ def upload_video():
     uploaded_paths = []
 
     for file in files:
-        filename = secure_filename(file.filename)
+        filename = korean_safe_filename(file.filename)
         save_path = os.path.join(current_app.config['UPLOAD_FOLDER'], filename)
         file.save(save_path)
         uploaded_paths.append(save_path)
@@ -93,7 +115,7 @@ def upload_video():
 #결과 반환환
 @main.route("/result_images")
 def result_images():
-    root_dir = os.path.join("static", "results")
+    root_dir = os.path.join("static", "predictResults")
     if not os.path.exists(root_dir):
         return jsonify([])
 
@@ -129,33 +151,15 @@ def result_images():
 @main.route('/delete_result_image', methods=['POST'])
 def delete_result_image():
     data = request.get_json()
-    relative_path = data.get("path")  # 예: results/results_20250519_xxxx/CCTV_/img.jpg
-
-    # ✅ static 경로
+    relative_path = data.get("path")  # 예: predictResults/영상폴더/img.jpg
     static_path = os.path.join("static", relative_path)
-
-    # ✅ Result 경로: static/results/ → Result/
-    parts = relative_path.split(os.sep)
-    if parts[0] == "results":
-        result_path = os.path.join("Result", *parts[1:])
-    else:
-        result_path = None  # fallback 처리
-
-    deleted = []
 
     try:
         if os.path.exists(static_path):
             os.remove(static_path)
-            deleted.append("static")
-        if result_path and os.path.exists(result_path):
-            os.remove(result_path)
-            deleted.append("Result")
-
-        if not deleted:
-            return jsonify({"error": "파일을 찾을 수 없습니다."}), 404
+            return jsonify({"success": True, "deleted": relative_path})
         else:
-            return jsonify({"success": True, "deleted_from": deleted})
-
+            return jsonify({"error": "파일을 찾을 수 없습니다."}), 404
     except Exception as e:
         return jsonify({"error": str(e)}), 500
     
@@ -169,11 +173,29 @@ def save_results_to_db():
     if not images:
         return jsonify({"error": "이미지 없음"}), 400
 
-    # 가장 최근 결과 폴더 이름 추출
-    first = images[0]
-    parts = first.split(os.sep)
-    result_folder = parts[1]  # results_20250519_141239
-    meta_path = os.path.join("static", "results", result_folder, "meta.json")
+    # ✅ 경로 정규화
+    first = images[0].replace("\\", "/")
+
+    # ✅ "results_YYYYMMDD_HHMMSS" 폴더 추출 (정규표현식 사용)
+    match = re.search(r"(results_\d{8}_\d{6})", first)
+    if not match:
+        return jsonify({"error": "결과 폴더명을 찾을 수 없습니다."}), 400
+
+    result_folder = match.group(1)  # 예: results_20250520_142553
+    meta_path = os.path.join("static", "predictResults", result_folder, "meta.json")
+    
+    import shutil
+
+    # 예: static/predictResults/results_타임스탬프 → static/results/results_타임스탬프
+    predict_folder = os.path.join("static", "predictResults", result_folder)
+    final_folder = os.path.join("static", "results", result_folder)
+
+    if os.path.exists(predict_folder):
+        try:
+            shutil.copytree(predict_folder, final_folder)
+            print(f"📁 결과 폴더 복사 완료: {final_folder}")
+        except Exception as e:
+            print(f"❌ 결과 복사 실패: {e}")
 
     try:
         insert_analysis_results_selected(images, meta_path)
