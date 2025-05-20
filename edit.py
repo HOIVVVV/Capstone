@@ -30,7 +30,7 @@ app.config['SQLALCHEMY_TRACK_MODIFICATIONS'] = False
 db = SQLAlchemy(app)
 
 #경로설정
-path = "edit.html"
+path = "upload.html"
 
 class DamageImage(db.Model):
     __tablename__ = 'damage_images'
@@ -139,7 +139,7 @@ def generate_chart():
         # ✅ 월 또는 분기 집계 단위
         if aggregate_unit == 'quarter':
             df['period'] = df['recorded_date'].dt.to_period('Q').astype(str)
-        else:
+        else:#MONTH 
             df['period'] = df['recorded_date'].dt.to_period('M').astype(str)
 
         # ✅ 교집합 필터링
@@ -422,7 +422,19 @@ def generate_chart():
             )
         ).add_to(m)
 
-        # ✅ 각 구에 마커 추가 (손상 건수 숫자 표시)
+        # # ✅ 각 구에 마커 추가 (손상 건수 숫자 표시)
+        # for idx, row in df_count.iterrows():
+        #     gu_name = row["location"]
+        #     count = row["count"]
+        #     if gu_name in gu_centers:
+        #         lat, lon = gu_centers[gu_name]
+        #         folium.Marker(
+        #             location=[lat, lon],
+        #             icon=folium.DivIcon(
+        #                 html=f"""<div style="font-size: 12pt; color: black; font-weight: bold">{count}</div>"""
+        #             )
+        #         ).add_to(m)
+        # ✅ 각 구에 마커 추가 (구 이름 + 손상 건수 숫자 표시, 가로 출력)
         for idx, row in df_count.iterrows():
             gu_name = row["location"]
             count = row["count"]
@@ -431,9 +443,16 @@ def generate_chart():
                 folium.Marker(
                     location=[lat, lon],
                     icon=folium.DivIcon(
-                        html=f"""<div style="font-size: 12pt; color: black; font-weight: bold">{count}</div>"""
+                        html=f"""
+                            <div style="text-align: center; white-space: nowrap;">
+                                <span style="font-size: 10pt; color: black;">{gu_name}</span><br>
+                                <span style="font-size: 12pt; color: black; font-weight: bold;">{count}</span>
+                            </div>
+                        """
                     )
                 ).add_to(m)
+
+
 
         # ✅ chart HTML 렌더링
         chart_html = m._repr_html_()
@@ -469,18 +488,12 @@ def generate_chart():
 @app.route('/front')
 def front_page():
     chart_type = request.form.get('chart_type')
-    selected_damage_types = request.form.getlist('damage_type')
-    selected_locations = request.form.getlist('location')
     aggregate_unit = request.form.get('aggregate_unit')
     start_date = request.form.get('start_date')
     end_date = request.form.get('end_date')
 
     query = db.session.query(Video.recorded_date, Video.location, DamageImage.damage_type).join(DamageImage)
 
-    if selected_damage_types:
-        query = query.filter(DamageImage.damage_type.in_(selected_damage_types))
-    if selected_locations:
-        query = query.filter(Video.location.in_(selected_locations))
 
     # ✅ 날짜 범위 필터링
     if start_date:
@@ -502,8 +515,6 @@ def front_page():
     locations = [l[0] for l in all_locations]
     min_date = df['recorded_date'].min().strftime('%Y-%m-%d')
     max_date = df['recorded_date'].max().strftime('%Y-%m-%d')
-    has_locations = bool(selected_locations)
-    has_damage_types = bool(selected_damage_types)
     
     #pieChart -> 손상유형통계
     summary = df['damage_type'].value_counts().reset_index()
@@ -528,10 +539,22 @@ def front_page():
         xaxis_title='위치',
         yaxis_title='건수'
     )
-
     chart_html2 = fig2.to_html(full_html=False)
+    
+    #line -> 손상발생빈도
+    df['recorded_date'] = pd.to_datetime(df['recorded_date'])
+
+    #df['period'] = df['recorded_date'].dt.to_period('Q').astype(str)#분기 quarter
+    df['period'] = df['recorded_date'].dt.to_period('M').astype(str)#달 month
+
+    summary = df.groupby('period').size().reset_index(name='count')
+    fig3 = px.line(summary, x = 'period', y= 'count')
+    chart_html3 =  fig3.to_html(full_html=False)
+
+
+
     return render_template('front.html', chart_html1=chart_html1,
-                           chart_html2=chart_html2)
+                           chart_html2=chart_html2, chart_html3 = chart_html3)
     
     
 
