@@ -85,6 +85,9 @@
       margin-bottom: 20px;
     }
   </style>
+
+  <script>
+  </script>
 </head>
 <body>
   <div class="d-flex" id="wrapper">
@@ -92,9 +95,9 @@
     <div class="sidebar">
       <div class="sidebar-heading px-3 pt-4 font-weight-bold">하수관로 관리 시스템</div>
       <div class="list-group list-group-flush">
-        <a href="#" class="list-group-item"><i class="fas fa-tachometer-alt mr-2"></i> 대시보드</a>
+        <a href="/dash" class="list-group-item"><i class="fas fa-tachometer-alt mr-2"></i> 대시보드</a>
         <a href="#" class="list-group-item"><i class="fas fa-search mr-2"></i> 관로 점검 결과</a>
-        <a href="/" class="list-group-item"><i class="fas fa-chart-pie mr-2"></i> 손상 통계</a>
+        <a href="/stats" class="list-group-item"><i class="fas fa-chart-pie mr-2"></i> 손상 통계</a>
         <a href="/mapping" class="list-group-item"><i class="fas fa-book mr-2"></i> 손상도 매핑</a>
         <a href="#" class="list-group-item"><i class="fas fa-chart-bar mr-2"></i> 손상 분석</a>
       </div>
@@ -165,7 +168,7 @@
                   </div>
                 {% endfor %}
               </div>
-              
+
             </div>
           </div>
         </form>
