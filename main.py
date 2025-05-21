@@ -125,6 +125,8 @@ def dashboard():
     ))
 
     fig3.update_layout(title='위치별 손상유형 히트맵', xaxis_title="손상 유형", yaxis_title="위치")
+    
+    chart_html3 = fig3.to_html(full_html=False)
 
     return render_template('dashboard.html',
                            chart_html1=chart_html1,
