@@ -1,0 +1,31 @@
+{% extends "base.html" %}
+{% set active_page = '' %}
+{% block title %}시스템 소개{% endblock %}
+
+{% block content %}
+<div style="padding: 100px; max-width: 900px; margin: auto; line-height: 1.8;">
+  <h2>💡 하수관로 관리 시스템 소개</h2>
+  <p>
+    본 시스템은 하수관로 내 CCTV 영상을 기반으로 손상 유형을 자동으로 분석하고 시각화하는 AI 기반 분석 시스템입니다.
+  </p>
+  <p>
+    주요 기능은 다음과 같습니다:
+  </p>
+  <ul>
+    <li>🎥 영상 업로드 및 자동 분석</li>
+    <li>📊 손상 유형 통계 및 월별/지역별 분석</li>
+    <li>🗺️ 손상 위치 매핑 기능</li>
+    <li>📂 분석 결과 DB 저장 및 삭제 기능</li>
+  </ul>
+  <p>
+    <p>
+    이 시스템은 유지보수 비용 절감과 빠른 하수관 진단을 목적으로 개발되었습니다<br>
+    실제 영상 기반의 모델 학습 및 배포 시스템을 포함합니다
+    </p>
+    <p>
+        <br><br><br>
+        Developed by Sejong University, Capstone Class, Team 6 (박준영 | 박재현 | 최규영)
+    </p>
+  </p>
+</div>
+{% endblock %}

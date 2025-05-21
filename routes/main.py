@@ -33,6 +33,10 @@ def dashboard():
 
     return render_template("dashboard.html", image_results=image_results)
 
+@main.route('/info')
+def system_info():
+    return render_template('info.html')
+
 @main.route("/stats")
 def stats():
     return render_template("stats.html", active_page="stats")
@@ -62,6 +66,21 @@ def count_summary():
             "videos": 0
         }), 500
         
+@main.route("/api/recent_images")
+def recent_images():
+    image_dir = os.path.join(current_app.static_folder, "results")
+    image_paths = []
+    for root, _, files in os.walk(image_dir):
+        for file in sorted(files, reverse=True):
+            if file.lower().endswith(('.jpg', '.jpeg', '.png')):
+                rel_path = os.path.relpath(os.path.join(root, file), current_app.static_folder)
+                image_paths.append("/static/" + rel_path.replace("\\", "/"))
+            if len(image_paths) >= 12:
+                break
+        if len(image_paths) >= 12:
+            break
+    return jsonify({"images": image_paths})
+        
 #진행도 바
 @main.route('/progress')
 def get_progress():
@@ -83,7 +102,6 @@ def get_progress():
 def upload_page():
     return render_template("upload.html")
 
-#영상 업로드
 @main.route("/upload", methods=["POST"])
 def upload_video():
     def korean_safe_filename(filename):
@@ -95,12 +113,22 @@ def upload_video():
     if 'video' not in request.files and 'video[]' not in request.files:
         return jsonify({'success': False, 'message': 'No video provided'})
 
-    # ✅ 단일 혹은 다중 업로드 지원
     files = request.files.getlist('video[]')
     uploaded_paths = []
+    renamed_files = []
 
     for file in files:
-        filename = korean_safe_filename(file.filename)
+        original_filename = file.filename
+        filename = korean_safe_filename(original_filename)
+
+        # ✅ 70자 초과 시 자르고 "_short" 추가
+        MAX_FILENAME_LENGTH = 70
+        name, ext = os.path.splitext(filename)
+        if len(filename) > MAX_FILENAME_LENGTH:
+            name = name[:MAX_FILENAME_LENGTH - len("_short" + ext)]
+            filename = name + "_short" + ext
+            renamed_files.append(original_filename)
+
         save_path = os.path.join(current_app.config['UPLOAD_FOLDER'], filename)
         file.save(save_path)
         uploaded_paths.append(save_path)
@@ -110,7 +138,12 @@ def upload_video():
     for path in uploaded_paths:
         Thread(target=analyze_video, args=(path,)).start()
 
-    return jsonify({'success': True})
+    # ✅ 사용자에게 알림 추가
+    message = "업로드 완료되었습니다."
+    if renamed_files:
+        message += f" 다음 파일명은 길어 간략화되었습니다: {', '.join(renamed_files)}"
+
+    return jsonify({'success': True, 'message': message})
 
 #결과 반환환
 @main.route("/result_images")

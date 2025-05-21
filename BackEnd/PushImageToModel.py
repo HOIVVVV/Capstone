@@ -138,7 +138,7 @@ def predict_image(image_path, save_path, video_title, frame_number):
     else:
         label_string = ",".join(f"{l}({int(p*100)})" for l, p in zip(top3_labels, top3_probs_vals))
 
-    base_filename = f"{video_title}_{frame_tag}_{label_string}"
+    base_filename = f"{frame_tag}_{label_string}"
     image_save_path = os.path.join(save_path, f"{base_filename}.jpg")
     gradcam_save_path = os.path.join(save_path, f"{base_filename}_GradCAM.jpg")
 

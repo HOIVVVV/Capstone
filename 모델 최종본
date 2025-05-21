@@ -52,8 +52,7 @@ weighted avg       0.97      0.97      0.97     25195
 
 
 
-
-                     Accuracy: 0.9721970079004875
+Accuracy: 0.9721970079004875
 Weighted F1: 0.9721797916815069
               precision    recall  f1-score   support
 

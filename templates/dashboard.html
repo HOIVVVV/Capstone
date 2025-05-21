@@ -6,7 +6,6 @@
 <div style="width: 100%;">
   <!-- 상단 2열 -->
   <div style="display: flex; gap: 20px; margin-bottom: 20px;">
-    <!-- 손상 유형 통계 -->
     <div class="card" style="flex: 1;">
       <h3>손상 유형 통계</h3>
       <p class="text-muted">하수관로 손상 유형별 분포</p>
@@ -20,7 +19,6 @@
       </p>
     </div>
 
-    <!-- 지역별 손상 빈도 -->
     <div class="card" style="flex: 2;">
       <h3>지역별 손상 빈도</h3>
       <p class="text-muted">상위 10개 구역</p>
@@ -34,7 +32,6 @@
 
   <!-- 하단 2열 -->
   <div style="display: flex; gap: 20px;">
-    <!-- 손상 발생 빈도 -->
     <div class="card" style="flex: 1;">
       <h3>손상 발생 빈도</h3>
       <p class="text-muted">월별 통계</p>
@@ -45,38 +42,138 @@
       </p>
     </div>
 
-    <!-- 검사 결과 요약 -->
-  <div class="card" style="flex: 1;">
-    <h3>검사 결과 요약</h3>
-    <p class="text-muted">최근 하수관로 검사 기록</p>
-    <table style="width: 100%; border-collapse: collapse;">
-      <thead>
-        <tr style="text-align: left; border-bottom: 1px solid #ccc;">
-          <th>시간</th>
-          <th>손상 상태</th>
-          <th>보기</th>
-        </tr>
-      </thead>
-      <tbody>
-        {% for item in image_results %}
-        <tr>
-          <td>{{ item.time }}</td>
-          <td>{{ item.label }}</td>
-          <td>
-            <a href="/static/{{ item.file }}" target="_blank">
-              <button>🔍</button>
-            </a>
-          </td>
-        </tr>
-        {% endfor %}
-        {% if image_results|length == 0 %}
-        <tr><td colspan="3">최근 손상 이미지가 없습니다.</td></tr>
-        {% endif %}
-      </tbody>
-    </table>
-    <p style="font-size: 12px; margin-top: 10px;">
-      <i class="fa fa-history"></i> 최신 기준
-    </p>
+    <!-- ✅ 검사 결과 요약 -->
+    <div class="card" style="flex: 1;">
+      <h3>검사 결과 요약</h3>
+      <p class="text-muted">최근 하수관로 검사 기록</p>
+      <table style="width: 100%; border-collapse: collapse;">
+        <thead>
+          <tr style="text-align: left; border-bottom: 1px solid #ccc;">
+            <th>시간</th>
+            <th>손상 상태</th>
+            <th>보기</th>
+          </tr>
+        </thead>
+        <tbody>
+          {% for item in image_results %}
+          <tr>
+            <td>{{ item.time }}</td>
+            <td>{{ item.label }}</td>
+            <td>
+              <!-- ✅ 모달 열기 -->
+              <button onclick="openPreviewModal('/static/{{ item.file }}')" style="border: none; background: none; cursor: pointer;">🔍</button>
+            </td>
+          </tr>
+          {% endfor %}
+          {% if image_results|length == 0 %}
+          <tr><td colspan="3">최근 손상 이미지가 없습니다.</td></tr>
+          {% endif %}
+        </tbody>
+      </table>
+      <p style="font-size: 12px; margin-top: 10px;">
+        <i class="fa fa-history"></i> 최신 기준
+      </p>
+    </div>
   </div>
+</div>
 
+<div class="modal-overlay" id="previewModal">
+  <div class="modal-content" id="modalContent" style="max-width: 60%; padding: 0;">
+    <span class="modal-close" onclick="closePreviewModal()" style="top: 5px; right: 10px;">&times;</span>
+    <img id="previewImage"
+         src=""
+         alt="미리보기"
+         style="max-width: 100%; transform: scale(1); transition: transform 0.2s;" />
+  </div>
+</div>
+
+<!-- ✅ JS -->
+<script>
+  let zoom = 1;
+const minZoom = 0.5;
+const maxZoom = 3;
+
+function openPreviewModal(imagePath) {
+  const modal = document.getElementById("previewModal");
+  const modalImg = document.getElementById("previewImage");
+  const modalContent = document.getElementById("modalContent");
+
+  zoom = 1;
+  modalImg.src = imagePath;
+  modalContent.style.transform = `scale(${zoom})`;
+  modal.style.display = "flex";
+}
+
+function closePreviewModal() {
+  document.getElementById("previewModal").style.display = "none";
+}
+
+// 휠로 모달 전체 확대/축소
+document.getElementById("previewModal").addEventListener("wheel", function (e) {
+  e.preventDefault();
+  const modalContent = document.getElementById("modalContent");
+  const factor = e.deltaY < 0 ? 1.1 : 0.9;
+  zoom *= factor;
+  zoom = Math.max(minZoom, Math.min(maxZoom, zoom));
+  modalContent.style.transform = `scale(${zoom})`;
+});
+
+  // ✅ ESC 키로 모달 닫기
+  window.addEventListener('keydown', function (event) {
+    if (event.key === 'Escape' && document.getElementById('previewModal').style.display === 'flex') {
+      closePreviewModal();
+    }
+  });
+
+  // ✅ 바깥 클릭 시 모달 닫기
+  document.getElementById('previewModal').addEventListener('click', function (e) {
+    if (e.target === this) {
+      closePreviewModal();
+    }
+  });
+</script>
+
+<!-- ✅ 기본 모달 스타일 -->
+<style>
+  .modal-overlay {
+    position: fixed;
+    top: 0; left: 0; right: 0; bottom: 0;
+    background: rgba(0,0,0,0.5);
+    display: none;
+    justify-content: center;
+    align-items: center;
+    z-index: 9999;
+  }
+
+  .modal-content {
+    background: white;
+    padding: 20px;
+    border-radius: 8px;
+    max-width: 90%;
+    max-height: 80%;
+    overflow-y: auto;
+    box-shadow: 0 4px 12px rgba(0, 0, 0, 0.2);
+    position: relative;
+    transition: transform 0.2s ease-in-out;
+  }
+
+  .modal-close {
+  position: absolute;
+  top: 10px;
+  right: 15px;
+  font-size: 24px;
+  font-weight: bold;
+  color: #fff; /* ✅ 흰색으로 눈에 잘 띄게 */
+  background: rgba(0, 0, 0, 0.6); /* ✅ 반투명 검정 배경 */
+  border: none;
+  border-radius: 50%;
+  width: 32px;
+  height: 32px;
+  line-height: 30px;
+  text-align: center;
+  cursor: pointer;
+  z-index: 1001; /* ✅ 항상 위에 보이도록 */
+}
+
+</style>
 {% endblock %}
