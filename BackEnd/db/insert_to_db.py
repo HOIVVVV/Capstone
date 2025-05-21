@@ -17,7 +17,7 @@ def insert_analysis_results(video_path, result_dir, district, recorded_date, db_
         print(f"📥 DB 데이터 삽입 시작")
         db.create_all()
 
-        video_title = os.path.basename(video_path)
+        video_title = os.path.splitext(os.path.basename(video_path))[0]
         recorded_date = datetime.now().date()
 
         new_video = Video(
@@ -104,7 +104,7 @@ def insert_analysis_results_selected(image_paths, meta_path):
     with app.app_context():
         db.create_all()
 
-        video_title = os.path.basename(meta["video_path"])
+        video_title = os.path.splitext(os.path.basename(meta["video_path"]))[0]
         recorded_date = meta.get("recorded_date")
         district = meta.get("district")
 

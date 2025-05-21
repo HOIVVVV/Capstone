@@ -24,11 +24,11 @@
     }
     #wrapper {
       display: flex;
-      height: 100%;
+      height: 100vh;
     }
     .sidebar {
       width: 240px;
-      min-height: 100%;
+      min-height: 100vh;
       background-color: #dc3545;
       color: white;
     }
@@ -91,18 +91,6 @@
   </style>
 
   <script>
-    function onChartTypeChange() {
-      const chartType = document.querySelector("select[name='chart_type']").value;
-      const aggregateUnitDiv = document.getElementById("aggregate-unit-div");
-
-      if (chartType === 'line') {
-        aggregateUnitDiv.style.display = 'block';
-      } else {
-        aggregateUnitDiv.style.display = 'none';
-      }
-    }
-
-    window.onload = onChartTypeChange;
   </script>
 </head>
 <body>
@@ -124,23 +112,9 @@
           <div class="form-group">
             <label>그래프 종류 선택:</label>
             <select name="chart_type" class="form-control w-25 d-inline-block" onchange="onChartTypeChange()">
-              <option value="bar" {% if chart_type == 'bar' %}selected{% endif %}>Bar 그래프</option>
-              <option value="pie" {% if chart_type == 'pie' %}selected{% endif %}>Pie 차트</option>
-              <option value="line" {% if chart_type == 'line' %}selected{% endif %}>Line 차트</option>
-              <option value="heatmap" {% if chart_type == 'heatmap' %}selected{% endif %}>Heatmap 차트</option>
-              <option value="stacked" {% if chart_type == 'stacked' %}selected{% endif %}>Stacked 차트</option>
               <option value="map" {% if chart_type == 'map' %}selected{% endif %}>Map 차트</option>
             </select>
             <button type="submit" class="btn btn-primary ml-3">그래프 생성</button>
-          </div>
-
-          <!-- 집계 단위 (line 그래프일 때만 표시) -->
-          <div id="aggregate-unit-div" class="form-group" style="display:none;">
-            <label>집계 단위:</label>
-            <select name="aggregate_unit" class="form-control w-25 d-inline-block">
-              <option value="month" {% if aggregate_unit == 'month' %}selected{% endif %}>월별</option>
-              <option value="quarter" {% if aggregate_unit == 'quarter' %}selected{% endif %}>분기별</option>
-            </select>
           </div>
 
           <!-- 차트 + 필터 박스 나란히 -->
