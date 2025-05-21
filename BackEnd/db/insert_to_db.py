@@ -78,11 +78,6 @@ def insert_analysis_results(video_path, result_dir, district, recorded_date, db_
 
 
 def insert_analysis_results_selected(image_paths, meta_path):
-    """
-    사용자가 최종 확인한 이미지 리스트(image_paths)만 DB에 저장.
-    image_paths: static 기준 상대 경로 리스트 (e.g. results/results_20250519_xxxx/영상폴더/파일.jpg)
-    meta_path: static 경로 내 meta.json 위치
-    """
     if not image_paths:
         print("❌ 저장할 이미지 없음")
         return
@@ -93,13 +88,20 @@ def insert_analysis_results_selected(image_paths, meta_path):
     with open(meta_path, "r", encoding="utf-8") as f:
         meta = json.load(f)
 
-    from db.models import db, Video, DamageImage
-    from flask import Flask
-
+    # ✅ Flask + DB 설정
     app = Flask(__name__)
     app.config['SQLALCHEMY_DATABASE_URI'] = 'mysql+pymysql://root:1234@localhost/capstone'
     app.config['SQLALCHEMY_TRACK_MODIFICATIONS'] = False
     db.init_app(app)
+
+    # ✅ 손상 라벨 맵
+    label_map = {
+        "균열(Crack,CL),파손(Broken-Pipe,BK)": 0,
+        "표면손상(Surface-Damage,SD),토사퇴적(Deposits-Silty,DS)": 1,
+        "연결관-돌출(Lateral-Protruding,LP)": 2,
+        "이음부-손상(Joint-Faulty,JF)": 3,
+        "기타결함(Etc.,ETC)": 4,
+    }
 
     with app.app_context():
         db.create_all()
@@ -120,28 +122,38 @@ def insert_analysis_results_selected(image_paths, meta_path):
 
         for rel_path in image_paths:
             try:
-                # ✅ 슬래시 통일
                 rel_path = rel_path.replace("\\", "/")
                 file_name = os.path.basename(rel_path)
                 image_title = os.path.splitext(file_name)[0]
 
-                parts = [p for p in image_title.split('_') if p.strip()]
-                timeline_str = next((p for p in parts if re.match(r"^f\d+$", p)), None)
-                if not timeline_str:
-                    raise ValueError("프레임 태그 f### 없음")
+                # f### 추출 (시간 코드용)
+                timeline_match = re.search(r"f(\d+)", image_title)
+                if not timeline_match:
+                    print(f"❌ 프레임 태그 없음: {image_title}")
+                    continue
 
-                seconds = int(timeline_str[1:])
+                seconds = int(timeline_match.group(1))
                 timecode = (datetime.min + timedelta(seconds=seconds)).time()
 
-                damage_info_str = image_title.split(f"{timeline_str}_")[-1]
-                damage_type = damage_info_str.split(',')[0].split('(')[0]
+                # ✅ 손상 라벨 탐색 (포함 여부 + 먼저 매칭되는 순서)
+                damage_type = None
+                for label in label_map:
+                    if label in image_title:
+                        damage_type = label
+                        print(f"✅ 매칭된 손상 타입: {damage_type}")
+                        break
 
+                if not damage_type:
+                    print(f"ℹ️ 매칭되는 손상 없음, 저장 제외: {rel_path}")
+                    continue
+
+                # ✅ DB 저장
                 damage_image = DamageImage(
                     video_id=new_video.video_id,
                     image_title=image_title,
-                    damage_type=damage_type,
+                    damage_type=damage_type,  # 라벨 전체 저장
                     timeline=timecode,
-                    image_path=rel_path  # ✅ 상대 경로로 저장
+                    image_path=rel_path
                 )
                 db.session.add(damage_image)
                 damage_image_count += 1
@@ -152,5 +164,4 @@ def insert_analysis_results_selected(image_paths, meta_path):
 
         new_video.damage_image_count = damage_image_count
         db.session.commit()
-
         print(f"✅ 선택된 이미지 {damage_image_count}개 저장 완료")

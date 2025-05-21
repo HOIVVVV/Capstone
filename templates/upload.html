@@ -16,12 +16,29 @@
 <div style="min-height: 85vh; display: flex; flex-direction: column; align-items: center; background: #f9f9f9; padding-top: 40px;">
 
   <!-- 🔼 상단: 업로드 카드 + 영상 리스트 -->
-  <div style="display: flex; gap: 40px; justify-content: center;">
-
+  <div style="
+  display: flex;
+  flex-wrap: wrap;
+  justify-content: center;
+  gap: 20px;
+  width: 100%;
+  max-width: 1200px;
+  padding: 0 20px;
+  box-sizing: border-box;
+">
     <!-- ⬅️ 업로드 카드 -->
     <div class="card"
-         style="width: 450px; height: 550px; box-shadow: 0 4px 10px rgba(0, 0, 0, 0.1);
-                text-align: center; display: flex; flex-direction: column; justify-content: center; align-items: center;">
+         style="
+        flex: 1 1 300px;   /* grow, shrink, basis */
+        box-shadow: 0 4px 10px rgba(0, 0, 0, 0.1);
+        text-align: center;
+        min-height: 600px;   /* ✅ 최소 높이 지정 */
+        height: auto;         /* ✅ 높이 자동 조절 */
+        display: flex;
+        flex-direction: column;
+        justify-content: center;
+        align-items: center;
+     ">
       <h2 style="margin-bottom: 16px;">하수관로 손상 분석</h2>
       <p class="text-muted" style="font-size: 16px; margin-bottom: 24px;">
         하수관로 영상을 입력하거나<br>드래그하여 업로드하세요.
@@ -56,8 +73,14 @@
 
     <!-- ➡️ 업로드된 영상 리스트 -->
     <div class="card"
-         style="width: 300px; max-height: 550px; overflow-y: auto;
-                box-shadow: 0 4px 10px rgba(0, 0, 0, 0.1); text-align: center;">
+         style="
+        flex: 1 1 300px;
+        min-height: 600px;   /* ✅ 최소 높이 지정 */
+        height: auto;         /* ✅ 높이 자동 조절 */
+        overflow-y: auto;
+        box-shadow: 0 4px 10px rgba(0, 0, 0, 0.1);
+        text-align: center;
+     ">
       <h4 style="margin: 16px 0;">업로드된 영상</h4>
       <ul id="fileList" style="list-style: none; padding: 0 16px; text-align: left;"></ul>
     </div>
@@ -90,11 +113,11 @@
 </div>
 
 <!-- 이미지 확대 모달 -->
-<div id="imageModal" style="display: none; position: fixed; z-index: 9999; left: 0; top: 0;
+<div id="predictImageModal" style="display: none; position: fixed; z-index: 9999; left: 0; top: 0;
   width: 100%; height: 100%; background-color: rgba(0,0,0,0.8); justify-content: center; align-items: center;">
-  <img id="modalImage" src="" alt="확대 이미지"
+  <img id="predictModalImage" src="" alt="확대 이미지"
     style="max-width: 90%; max-height: 90%; transform: scale(1); transition: transform 0.3s ease;" />
-  <button onclick="closeModal()"
+  <button onclick="closePredictModal()"
     style="position: absolute; top: 20px; right: 30px; font-size: 24px; color: white; background: none; border: none; cursor: pointer;">✖</button>
 </div>
 
@@ -122,36 +145,50 @@
   document.getElementById('videoInput').value = '';
  }
 
-  function uploadVideo() {
-    if (pollingActive) return;
-    if (uploadedFiles.length === 0) {
-      alert("먼저 영상을 선택하세요.");
-      return;
-    }
+ function uploadVideo() {
+  // progress 초기화 후 실제 업로드
+  fetch("/reset_progress", { method: "POST" })
+    .then(() => realUpload());
+}
 
-    pollingActive = true;
+  function realUpload() {
+  if (pollingActive) return;
+  if (uploadedFiles.length === 0) {
+    alert("먼저 영상을 선택하세요.");
+    return;
+  }
 
-    const box = document.getElementById("progress-box");
-    const text = document.getElementById("progress-text");
-    const bar = document.getElementById("progress-bar");
+  // ✅ 이전 분석 결과 초기화
+  document.getElementById("result-grid").innerHTML = '';
+  document.getElementById("result-box").style.display = "none";
 
-    box.style.display = "block";
-    text.innerText = "🚀 영상 업로드 중...";
-    bar.style.width = "0%";
+  // 🎯 맨 앞 영상 제거하고 저장
+  const file = uploadedFiles.shift();
 
-    const formData = new FormData();
-    for (const file of uploadedFiles) {
-    formData.append("video[]", file);  // ✅ 배열 형태로 전달
-    }
+  // ✅ 리스트 UI 갱신
+  handleFiles(uploadedFiles);
 
-    fetch("/upload", {
-      method: "POST",
-      body: formData
-    })
+  pollingActive = true;
+
+  const box = document.getElementById("progress-box");
+  const text = document.getElementById("progress-text");
+  const bar = document.getElementById("progress-bar");
+
+  box.style.display = "block";
+  text.innerText = "🚀 영상 업로드 중...";
+  bar.style.width = "0%";
+
+  const formData = new FormData();
+  formData.append("video[]", file);  // ✅ 단일 영상만 업로드
+
+  fetch("/upload", {
+    method: "POST",
+    body: formData
+  })
     .then(res => res.json())
     .then(result => {
       if (result.success) {
-        pollProgress();
+        pollProgress();  // ✅ 콜백 없이 진행
       } else {
         pollingActive = false;
         text.innerText = "❌ 업로드 실패: " + result.message;
@@ -162,35 +199,36 @@
       text.innerText = "❌ 네트워크 오류 발생";
       console.error(err);
     });
-  }
+}
 
-  function pollProgress() {
-    fetch("/progress")
-      .then(res => res.json())
-      .then(data => {
-        const text = document.getElementById("progress-text");
-        const bar = document.getElementById("progress-bar");
+  function pollProgress(onComplete = null) {
+  fetch("/progress")
+    .then(res => res.json())
+    .then(data => {
+      const text = document.getElementById("progress-text");
+      const bar = document.getElementById("progress-bar");
 
-        text.innerText = data.step;
-        bar.style.width = data.percent + "%";
+      text.innerText = data.step;
+      bar.style.width = data.percent + "%";
 
-        if (data.done) {
-          text.innerText = "✅ 분석 완료!";
-          pollingActive = false;
-          uploadedFiles = [];  // 완료 후 파일 목록 초기화
-          document.getElementById('fileList').innerHTML = '';
+      if (data.done) {
+        text.innerText = "✅ 분석 완료!";
+        pollingActive = false;
 
-          fetch('/result_images')
-            .then(res => res.json())
-            .then(images => {
-              renderResults(images);
-              document.getElementById("result-box").style.display = "block";  // ✅ 분석 완료 후만 표시
-            });
-          return;
-        }
-        setTimeout(pollProgress, 1000);
-      });
-  }
+        fetch('/result_images')
+          .then(res => res.json())
+          .then(images => {
+            renderResults(images);
+            document.getElementById("result-box").style.display = "block";
+          });
+
+        if (typeof onComplete === "function") onComplete();  // ✅ 완료 후 콜백 실행
+        return;
+      }
+
+      setTimeout(() => pollProgress(onComplete), 1000);
+    });
+}
 
   function renderResults(images) {
   const resultGrid = document.getElementById('result-grid');
@@ -219,7 +257,7 @@
     img.style.borderRadius = '6px';
     img.style.marginBottom = '8px';
     img.dataset.path = imgPath;
-    img.onclick = () => openModal(img.src);
+    img.onclick = () => openPredictModal(img.src);
 
     const caption = document.createElement('div');
     caption.textContent = label;
@@ -331,33 +369,37 @@ function confirmResults() {
 
 let zoom = 1;
 
-function openModal(src) {
-  const modal = document.getElementById("imageModal");
-  const modalImg = document.getElementById("modalImage");
+function openPredictModal(src) {
+  const modal = document.getElementById("predictImageModal");
+  const modalImg = document.getElementById("predictModalImage");
   modalImg.src = src;
   zoom = 1;
   modalImg.style.transform = `scale(${zoom})`;
   modal.style.display = "flex";
 }
 
-function closeModal() {
-  document.getElementById("imageModal").style.display = "none";
+function closePredictModal() {
+    const modal = document.getElementById("predictImageModal");
+  modal.style.display = "none";
 }
 
 // 확대/축소 (마우스 휠)
-document.getElementById("imageModal").addEventListener("wheel", function (e) {
+document.getElementById("predictImageModal").addEventListener("wheel", function (e) {
   e.preventDefault();
   if (e.deltaY < 0) {
     zoom += 0.1;
   } else {
     zoom = Math.max(1, zoom - 0.1);
   }
-  document.getElementById("modalImage").style.transform = `scale(${zoom})`;
+  document.getElementById("predictModalImage").style.transform = `scale(${zoom})`;
 });
 
 document.addEventListener('keydown', function (e) {
   if (e.key === 'Escape') {
-    closeModal();
+    const modal = document.getElementById("predictImageModal");
+    if (modal.style.display === "flex") {
+      closePredictModal();
+    }s
   }
 });
 </script>

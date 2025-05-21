@@ -1,9 +1,11 @@
 # app.py
+import os
+import sys
+sys.path.append(os.path.abspath(os.path.dirname(__file__)))
 from flask import Flask
 from routes.main import main  # 🔥 Blueprint import
 from BackEnd.db.models import db      # 🔥 SQLAlchemy db 객체
 from BackEnd.db.init_db import initialize_database  # 🔥 DB 초기화 함수
-import os
 
 app = Flask(__name__)
 

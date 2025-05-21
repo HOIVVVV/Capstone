@@ -2,7 +2,7 @@
 import os
 import sys
 import re
-sys.path.append(os.path.abspath(os.path.dirname(__file__)))
+import shutil
 from flask import Blueprint, render_template, request, current_app
 from flask import Blueprint, request, jsonify, current_app
 from werkzeug.utils import secure_filename
@@ -153,20 +153,34 @@ def count_summary():
             "videos": 0
         }), 500
         
-@main.route("/api/recent_images")
+@main.route('/api/recent_images')
 def recent_images():
-    image_dir = os.path.join(current_app.static_folder, "results")
-    image_paths = []
-    for root, _, files in os.walk(image_dir):
-        for file in sorted(files, reverse=True):
+    base_folder = os.path.join("static", "predictResults")
+
+    # results_로 시작하는 하위 폴더 중 가장 최근 것 찾기
+    all_result_folders = sorted(
+        [f for f in os.listdir(base_folder) if f.startswith("results_")],
+        reverse=True
+    )
+
+    if not all_result_folders:
+        return jsonify({"images": []})
+
+    latest_folder = all_result_folders[0]
+    latest_folder_path = os.path.join(base_folder, latest_folder)
+
+    # 하위 모든 이미지 찾기 (.jpg, .png 등)
+    image_files = []
+    for root, _, files in os.walk(latest_folder_path):
+        for file in files:
             if file.lower().endswith(('.jpg', '.jpeg', '.png')):
-                rel_path = os.path.relpath(os.path.join(root, file), current_app.static_folder)
-                image_paths.append("/static/" + rel_path.replace("\\", "/"))
-            if len(image_paths) >= 12:
-                break
-        if len(image_paths) >= 12:
-            break
-    return jsonify({"images": image_paths})
+                rel_path = os.path.relpath(os.path.join(root, file), "static")
+                image_files.append("/static/" + rel_path.replace("\\", "/"))
+
+    # 최신 이미지 12개만 리턴 (파일 이름 기준 정렬)
+    image_files = sorted(image_files, reverse=True)[:12]
+
+    return jsonify({"images": image_files})
         
 #진행도 바
 @main.route('/progress')
@@ -670,6 +684,13 @@ def get_video(video_id):
         main.logger.error(f"영상 정보 조회 오류: {str(e)}")
         return jsonify({'error': '영상 정보를 불러오는데 실패했습니다.'}), 500
 
+@main.route('/reset_progress', methods=['POST'])
+def reset_progress():
+    progress["step"] = "대기 중"
+    progress["percent"] = 0
+    progress["current_file"] = ""
+    progress["done"] = False
+    return jsonify({"success": True})
 
 @main.route('/api/videos/<int:video_id>', methods=['DELETE'])
 def delete_video(video_id):
@@ -687,7 +708,32 @@ def delete_video(video_id):
                 image_path = os.path.join("static", relative_path)
                 if os.path.exists(image_path):
                     os.remove(image_path)
+            # ✅ 해당 영상의 results 폴더 삭제 시도
+            cursor.execute("SELECT title FROM videos WHERE video_id = %s", (video_id,))
+            video_row = cursor.fetchone()
 
+            if video_row:
+                video_title = video_row['title']
+                result_root = "static/results"
+
+                for folder_name in os.listdir(result_root):
+                    folder_path = os.path.join(result_root, folder_name)
+                    video_folder_path = os.path.join(folder_path, video_title)
+
+                    if os.path.exists(video_folder_path) and os.path.isdir(video_folder_path):
+                        try:
+                            # ✅ 영상 폴더 삭제
+                            shutil.rmtree(video_folder_path)
+                            print(f"🗑️ 영상 폴더 삭제 완료: {video_folder_path}")
+
+                            # ✅ 결과 상위 폴더도 무조건 삭제
+                            shutil.rmtree(folder_path)
+                            print(f"🗑️ 상위 결과 폴더도 삭제됨: {folder_path}")
+
+                        except Exception as e:
+                            print(f"❌ 삭제 실패: {e}")
+
+        
             # 데이터베이스에서 이미지 삭제
             cursor.execute("DELETE FROM damage_images WHERE video_id = %s", (video_id,))
 
@@ -708,6 +754,7 @@ def delete_video(video_id):
     
     # 한글 폰트 설정
 if platform.system() == 'Windows':
+    
     rc('font', family='Malgun Gothic')
 else:
     rc('font', family='AppleGothic')

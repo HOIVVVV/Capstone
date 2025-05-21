@@ -142,7 +142,7 @@
   <!-- ✅ 이미지 모달 -->
   <div class="modal-overlay" id="imageModal">
     <div class="modal-content">
-      <span class="modal-close" onclick="closeModal()">&times;</span>
+      <span class="modal-close" onclick="closeBaseModal()">&times;</span>
       <h3 style="margin-top: 0;">📸 최근 이미지</h3>
       <div id="imageList" style="display: grid; grid-template-columns: repeat(auto-fill, minmax(200px, 1fr)); gap: 10px;"></div>
     </div>
@@ -184,9 +184,15 @@
     }
 
     // 이미지 팝업 닫기
-    function closeModal() {
+    function closeBaseModal() {
       document.getElementById('imageModal').style.display = 'none';
     }
+
+    document.addEventListener('keydown', function (e) {
+  if (e.key === 'Escape') {
+    closeBaseModal();
+  }
+});
   </script>
 </body>
 </html>
