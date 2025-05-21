@@ -11,6 +11,10 @@ from BackEnd import progress
 from BackEnd.db.insert_to_db import insert_analysis_results_selected
 from BackEnd.db.models import db, DamageImage, Video  # 모델 경로에 맞게 조정
 
+from flask import Flask, request, jsonify, send_from_directory, render_template
+from BackEnd.db.db_config import get_connection
+import traceback
+
 main = Blueprint('main', __name__)
 
 @main.route('/')
@@ -235,3 +239,384 @@ def save_results_to_db():
         return jsonify({"success": True})
     except Exception as e:
         return jsonify({"error": str(e)}), 500
+    
+    
+@main.route('/edit_image.html')
+def edit_image():
+    return render_template('edit_image.html')
+
+@main.route('/edit_video.html')
+def edit_video_page():
+    return render_template('edit_video.html')
+
+
+@main.route('/api/options')
+def get_options():
+    try:
+        conn = get_connection()
+        with conn.cursor() as cursor:
+            cursor.execute("SELECT DISTINCT damage_type FROM damage_images ORDER BY damage_type")
+            damage_types = [row['damage_type'] for row in cursor.fetchall()]
+
+            cursor.execute("SELECT DISTINCT location FROM videos ORDER BY location")
+            locations = [row['location'] for row in cursor.fetchall()]
+
+            cursor.execute("SELECT DISTINCT title FROM videos ORDER BY title")
+            titles = [row['title'] for row in cursor.fetchall()]
+
+        return jsonify({
+            'damage_types': damage_types,
+            'locations': locations,
+            'titles': titles
+        })
+    except Exception as e:
+        main.logger.error(f"Error loading options: {str(e)}")
+        return jsonify({'error': '옵션 데이터를 불러오는 중 오류가 발생했습니다.'}), 500
+
+    
+def extract_static_path(full_path):
+    """
+    절대 경로에서 'static' 폴더 이후의 경로만 추출하고,
+    웹에서 쓸 수 있도록 슬래시(`/`)로 변환함
+    """
+    match = re.search(r'static[/\\](.+)$', full_path)
+    if match:
+        return match.group(1).replace('\\', '/')
+    return full_path.replace('\\', '/')
+
+
+@main.route('/api/images', methods=['GET'])
+def get_images():
+    try:
+        damage_type = request.args.get('damage_type')
+        location = request.args.get('location')
+        title = request.args.get('title')
+        start_date = request.args.get('start_date')
+        end_date = request.args.get('end_date')
+        page = int(request.args.get('page', 1))
+        per_page = int(request.args.get('per_page', 10))
+
+        query = """
+            SELECT d.image_id, d.image_title, d.damage_type, d.timeline, 
+                   v.title AS video_title, v.location, v.recorded_date
+            FROM damage_images d
+            JOIN videos v ON d.video_id = v.video_id
+            WHERE 1=1
+        """
+        params = []
+
+        if damage_type:
+            query += " AND d.damage_type = %s"
+            params.append(damage_type)
+        if location:
+            query += " AND v.location = %s"
+            params.append(location)
+        if title:
+            query += " AND v.title = %s"
+            params.append(title)
+        if start_date and end_date:
+            query += " AND v.recorded_date BETWEEN %s AND %s"
+            params.extend([start_date, end_date])
+        elif start_date:
+            query += " AND v.recorded_date >= %s"
+            params.append(start_date)
+        elif end_date:
+            query += " AND v.recorded_date <= %s"
+            params.append(end_date)
+
+        count_query = f"SELECT COUNT(*) as total FROM ({query}) as subquery"
+
+        query += " ORDER BY v.recorded_date DESC, d.image_title"
+        query += " LIMIT %s OFFSET %s"
+        offset = (page - 1) * per_page
+        params.extend([per_page, offset])
+
+        conn = get_connection()
+        with conn.cursor() as cursor:
+            cursor.execute(count_query, params[:-2])
+            total = cursor.fetchone()['total']
+
+            cursor.execute(query, params)
+            results = cursor.fetchall()
+
+            for row in results:
+
+                if row['recorded_date']:
+                    row['recorded_date'] = row['recorded_date'].strftime('%Y-%m-%d')
+                if row['timeline']:
+                    row['timeline'] = str(row['timeline'])
+
+        pagination = {
+            'total': total,
+            'page': page,
+            'per_page': per_page,
+            'pages': (total + per_page - 1) // per_page
+        }
+
+        return jsonify({
+            'images': results,
+            'pagination': pagination
+        })
+
+    except Exception as e:
+        main.logger.error(f"Error retrieving images: {str(e)}")
+        main.logger.error(traceback.format_exc())
+        return jsonify({'error': '이미지 조회 중 오류가 발생했습니다.'}), 500
+
+@main.route('/api/images/<int:image_id>', methods=['GET'])
+def get_image(image_id):
+    try:
+        conn = get_connection()
+        with conn.cursor() as cursor:
+            cursor.execute("""
+                SELECT d.*, v.title AS video_title, v.location, v.recorded_date
+                FROM damage_images d
+                JOIN videos v ON d.video_id = v.video_id
+                WHERE d.image_id = %s
+            """, (image_id,))
+            image = cursor.fetchone()
+
+            if not image:
+                return jsonify({'error': '해당 이미지를 찾을 수 없습니다.'}), 404
+
+            # image['image_exists'] = os.path.exists(os.path.join("static", image['image_path']))
+
+            relative_path = extract_static_path(image['image_path'])
+            image['image_exists'] = os.path.exists(os.path.join("static", relative_path))
+            # 클라이언트에게 보내는 경로도 처리 (선택사항)
+            image['image_path'] = relative_path
+
+            if image['recorded_date']:
+                image['recorded_date'] = image['recorded_date'].strftime('%Y-%m-%d')
+            if image['timeline']:
+                image['timeline'] = str(image['timeline'])
+
+            return jsonify({'image': image})
+
+    except Exception as e:
+        main.logger.error(f"Error loading image: {str(e)}")
+        return jsonify({'error': '이미지 정보 로딩 중 오류가 발생했습니다.'}), 500
+
+@main.route('/api/images/<int:image_id>', methods=['PUT'])
+def update_image(image_id):
+    try:
+        data = request.json
+        image_title = data.get('image_title')
+        damage_type = data.get('damage_type')
+
+        if not all([image_title, damage_type]):
+            return jsonify({'error': '이미지 제목과 손상 유형을 입력해야 합니다.'}), 400
+
+        conn = get_connection()
+        with conn.cursor() as cursor:
+            cursor.execute("SELECT COUNT(*) AS count FROM damage_images WHERE image_id = %s", (image_id,))
+            if cursor.fetchone()['count'] == 0:
+                return jsonify({'error': '해당 이미지 ID가 존재하지 않습니다.'}), 404
+
+            cursor.execute("""
+                UPDATE damage_images
+                SET image_title = %s, damage_type = %s
+                WHERE image_id = %s
+            """, (image_title, damage_type, image_id))
+            conn.commit()
+
+        return jsonify({'message': '이미지 정보가 성공적으로 수정되었습니다.'})
+
+    except Exception as e:
+        main.logger.error(f"Error updating image: {str(e)}")
+        return jsonify({'error': '이미지 정보 수정 중 오류가 발생했습니다.'}), 500
+
+
+@main.route('/api/images/<int:image_id>', methods=['DELETE'])
+def delete_image(image_id):
+    try:
+        conn = get_connection()
+        with conn.cursor() as cursor:
+            cursor.execute("SELECT image_path, video_id FROM damage_images WHERE image_id = %s", (image_id,))
+            row = cursor.fetchone()
+            if not row:
+                return jsonify({'error': '해당 이미지가 존재하지 않습니다.'}), 404
+
+            image_path = row['image_path']
+            video_id = row['video_id']
+
+            cursor.execute("DELETE FROM damage_images WHERE image_id = %s", (image_id,))
+            cursor.execute("""
+                UPDATE videos
+                SET damage_image_count = damage_image_count - 1
+                WHERE video_id = %s AND damage_image_count > 0
+            """, (video_id,))
+
+
+            cursor.execute("SELECT damage_image_count FROM videos WHERE video_id = %s", (video_id,))
+            count = cursor.fetchone()
+            if count and count['damage_image_count'] == 0:
+                cursor.execute("DELETE FROM videos WHERE video_id = %s", (video_id,))
+
+            conn.commit()
+
+        # full_path = os.path.join("static", image_path)
+        relative_path = extract_static_path(image_path)
+        full_path = os.path.join("static", relative_path)
+        if os.path.exists(full_path):
+            os.remove(full_path)
+
+        return jsonify({'message': '이미지가 성공적으로 삭제되었습니다.'})
+
+    except Exception as e:
+        main.logger.error(f"Error deleting image: {str(e)}")
+        return jsonify({'error': '이미지 삭제 중 오류가 발생했습니다.'}), 500
+
+
+
+@main.route('/api/videos', methods=['GET'])
+def get_videos():
+    try:
+        title = request.args.get('title')
+        location = request.args.get('location')
+        start_date = request.args.get('start_date')
+        end_date = request.args.get('end_date')
+        page = int(request.args.get('page', 1))
+        per_page = int(request.args.get('per_page', 10))
+
+        query = """
+            SELECT video_id, title, location, recorded_date, damage_image_count
+            FROM videos
+            WHERE 1=1
+        """
+        params = []
+
+        if title:
+            query += " AND title = %s"
+            params.append(title)
+        if location:
+            query += " AND location = %s"
+            params.append(location)
+        if start_date and end_date:
+            query += " AND recorded_date BETWEEN %s AND %s"
+            params.extend([start_date, end_date])
+        elif start_date:
+            query += " AND recorded_date >= %s"
+            params.append(start_date)
+        elif end_date:
+            query += " AND recorded_date <= %s"
+            params.append(end_date)
+
+        count_query = f"SELECT COUNT(*) AS total FROM ({query}) AS subquery"
+
+        query += " ORDER BY recorded_date DESC"
+        query += " LIMIT %s OFFSET %s"
+        offset = (page - 1) * per_page
+        params.extend([per_page, offset])
+
+        conn = get_connection()
+        with conn.cursor() as cursor:
+            cursor.execute(count_query, params[:-2])
+            total = cursor.fetchone()['total']
+
+            cursor.execute(query, params)
+            videos = cursor.fetchall()
+
+        pagination = {
+            'total': total,
+            'page': page,
+            'per_page': per_page,
+            'pages': (total + per_page - 1) // per_page
+        }
+
+        return jsonify({'videos': videos, 'pagination': pagination})
+
+    except Exception as e:
+        main.logger.error(f"영상 정보 조회 오류: {str(e)}")
+        return jsonify({'error': '영상 조회 중 오류가 발생했습니다.'}), 500
+
+@main.route('/api/videos/<int:video_id>', methods=['PUT'])
+def update_video(video_id):
+    try:
+        data = request.json
+        title = data.get('title')
+        location = data.get('location')
+        recorded_date = data.get('recorded_date')
+
+        if not all([title, location, recorded_date]):
+            return jsonify({'error': '영상 제목, 촬영 위치, 촬영 날짜를 모두 입력해야 합니다.'}), 400
+
+        conn = get_connection()
+        with conn.cursor() as cursor:
+            cursor.execute("SELECT COUNT(*) AS count FROM videos WHERE video_id = %s", (video_id,))
+            if cursor.fetchone()['count'] == 0:
+                return jsonify({'error': '해당 영상 ID가 존재하지 않습니다.'}), 404
+
+            cursor.execute("""
+                UPDATE videos
+                SET title = %s, location = %s, recorded_date = %s
+                WHERE video_id = %s
+            """, (title, location, recorded_date, video_id))
+            conn.commit()
+
+        return jsonify({'message': '영상 정보가 성공적으로 수정되었습니다.'})
+
+    except Exception as e:
+        main.logger.error(f"Error updating video: {str(e)}")
+        return jsonify({'error': '영상 정보 수정 중 오류가 발생했습니다.'}), 500
+
+
+@main.route('/api/videos/<int:video_id>', methods=['GET'])
+def get_video(video_id):
+    try:
+        conn = get_connection()
+        with conn.cursor() as cursor:
+            cursor.execute("""
+                SELECT video_id, title, location, recorded_date, damage_image_count
+                FROM videos
+                WHERE video_id = %s
+            """, (video_id,))
+            video = cursor.fetchone()
+
+            if not video:
+                return jsonify({'error': '해당 영상을 찾을 수 없습니다.'}), 404
+
+            if video['recorded_date']:
+                video['recorded_date'] = video['recorded_date'].strftime('%Y-%m-%d')
+
+            return jsonify({'video': video})
+
+    except Exception as e:
+        main.logger.error(f"영상 정보 조회 오류: {str(e)}")
+        return jsonify({'error': '영상 정보를 불러오는데 실패했습니다.'}), 500
+
+
+@main.route('/api/videos/<int:video_id>', methods=['DELETE'])
+def delete_video(video_id):
+    try:
+        conn = get_connection()
+        with conn.cursor() as cursor:
+            # 영상과 연결된 이미지 정보 조회
+            cursor.execute("SELECT image_path FROM damage_images WHERE video_id = %s", (video_id,))
+            images = cursor.fetchall()
+
+            # 이미지 파일 삭제
+            for image in images:
+                # image_path = os.path.join("static", image['image_path'])
+                relative_path = extract_static_path(image['image_path'])
+                image_path = os.path.join("static", relative_path)
+                if os.path.exists(image_path):
+                    os.remove(image_path)
+
+            # 데이터베이스에서 이미지 삭제
+            cursor.execute("DELETE FROM damage_images WHERE video_id = %s", (video_id,))
+
+            # 영상 삭제
+            cursor.execute("DELETE FROM videos WHERE video_id = %s", (video_id,))
+
+            conn.commit()
+
+            return jsonify({'message': '영상이 성공적으로 삭제되었습니다.'})
+
+    except Exception as e:
+        main.logger.error(f"영상 삭제 오류: {str(e)}")
+        main.logger.error(traceback.format_exc())
+        return jsonify({'error': '영상 삭제 중 오류가 발생했습니다.'}), 500
+
+
+

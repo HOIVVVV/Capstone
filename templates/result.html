@@ -1,1 +1,762 @@
-result
+{% extends "base.html" %}
+{% set active_page = 'dashboard' %}
+{% block title %}대시보드{% endblock %}
+
+{% block content %}
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+  <meta charset="UTF-8">
+  <title>하수관로 관리 시스템</title>
+  <style>
+
+
+    body {
+      margin: 0;
+      font-family: 'Noto Sans KR', sans-serif;
+      display: flex;
+      height: 100vh;
+    }
+
+    .sidebar {
+      width: 220px;
+      background-color: #d32f2f;
+      color: white;
+      padding: 20px;
+      box-sizing: border-box;
+    }
+
+    .sidebar h2 {
+      margin-top: 0;
+      font-size: 20px;
+    }
+
+    .menu {
+      list-style: none;
+      padding: 0;
+      margin-top: 20px;
+    }
+
+    .menu li {
+      padding: 10px 0;
+    }
+
+    .menu li a {
+      color: white;
+      text-decoration: none;
+    }
+
+    .menu li a:hover {
+      text-decoration: underline;
+    }
+
+    .main-content {
+      flex-grow: 1;
+      background-color: #f4f4f4;
+      padding: 30px;
+      overflow-y: auto;
+    }
+
+    .section {
+      background: white;
+      padding: 20px;
+      border-radius: 8px;
+      box-shadow: 0 2px 6px rgba(0, 0, 0, 0.1);
+      margin-bottom: 30px;
+    }
+
+    .search-form {
+      display: flex;
+      flex-wrap: wrap;
+      gap: 15px;
+      align-items: flex-end;
+    }
+
+    .form-group {
+      flex: 1;
+      min-width: 200px;
+    }
+
+    .form-group.date-range {
+      flex: 2;
+    }
+
+    .date-inputs {
+      display: flex;
+      align-items: center;
+      gap: 10px;
+    }
+
+    .date-inputs input {
+      flex: 1;
+    }
+
+    .date-inputs span {
+      color: #666;
+      font-weight: 500;
+    }
+
+    .form-group.button-group {
+      flex-basis: 100%;
+      display: flex;
+      gap: 10px;
+      margin-top: 5px;
+    }
+
+    .form-group label {
+      display: block;
+      margin-bottom: 5px;
+      font-weight: 500;
+      font-size: 14px;
+    }
+
+    .form-group input,
+    .form-group select {
+      width: 100%;
+      padding: 10px;
+      border: 1px solid #ddd;
+      border-radius: 4px;
+      font-size: 14px;
+    }
+
+    button {
+      background-color: #3498db;
+      color: white;
+      border: none;
+      padding: 10px 20px;
+      border-radius: 4px;
+      cursor: pointer;
+      transition: background-color 0.3s;
+      font-size: 14px;
+    }
+
+    .reset-btn {
+      background-color: #7f8c8d;
+    }
+
+    button:hover {
+      background-color: #2980b9;
+    }
+
+    .reset-btn:hover {
+      background-color: #95a5a6;
+    }
+
+    /* 결과 표시 스타일 */
+    .results-container {
+      margin-top: 15px;
+    }
+
+    .results-table {
+      width: 100%;
+      border-collapse: collapse;
+      margin-bottom: 20px;
+    }
+
+    .results-table th,
+    .results-table td {
+      padding: 12px;
+      text-align: left;
+      border-bottom: 1px solid #ddd;
+    }
+
+    .results-table th {
+      background-color: #f8f9fa;
+      font-weight: 600;
+    }
+
+    .results-table tr:hover {
+      background-color: #f5f5f5;
+    }
+
+    /* 페이지네이션 스타일 */
+    .video-pagination,
+    .image-pagination {
+      margin-top: 15px;
+      text-align: center;
+    }
+
+    .video-pagination button,
+    .image-pagination button {
+      margin: 0 2px;
+      padding: 8px 12px;
+      background-color: #f8f9fa;
+      border: 1px solid #ddd;
+      color: #333;
+    }
+
+    .video-pagination button.active,
+    .image-pagination button.active {
+      background-color: #3498db;
+      color: white;
+      border-color: #3498db;
+    }
+
+    .no-result {
+      text-align: center;
+      color: #666;
+      font-style: italic;
+      padding: 20px;
+    }
+
+    .view-btn {
+      background-color: #3498db;
+      color: white;
+      border: none;
+      padding: 6px 12px;
+      border-radius: 4px;
+      font-size: 13px;
+      cursor: pointer;
+      transition: background-color 0.3s;
+    }
+
+    .view-btn:hover {
+      background-color: #2980b9;
+    }
+
+  </style>
+</head>
+<body>
+  <div class="main-content">
+    <div class="section">
+      <h2>영상 정보 조회</h2>
+      <form class="search-form" id="videoSearchForm">
+        <div class="form-group">
+          <label for="videoTitle">영상 제목:</label>
+          <select id="videoTitle">
+            <option value="">전체</option>
+          </select>
+        </div>
+
+        <div class="form-group">
+          <label for="videoLocation">촬영 위치:</label>
+          <select id="videoLocation">
+            <option value="">전체</option>
+            <option value="강남구">강남구</option>
+            <option value="강동구">강동구</option>
+            <option value="강북구">강북구</option>
+            <option value="강서구">강서구</option>
+            <option value="관악구">관악구</option>
+            <option value="광진구">광진구</option>
+            <option value="구로구">구로구</option>
+            <option value="금천구">금천구</option>
+            <option value="노원구">노원구</option>
+            <option value="도봉구">도봉구</option>
+            <option value="동대문구">동대문구</option>
+            <option value="동작구">동작구</option>
+            <option value="마포구">마포구</option>
+            <option value="서대문구">서대문구</option>
+            <option value="서초구">서초구</option>
+            <option value="성동구">성동구</option>
+            <option value="성북구">성북구</option>
+            <option value="송파구">송파구</option>
+            <option value="양천구">양천구</option>
+            <option value="영등포구">영등포구</option>
+            <option value="용산구">용산구</option>
+            <option value="은평구">은평구</option>
+            <option value="종로구">종로구</option>
+            <option value="중구">중구</option>
+            <option value="중랑구">중랑구</option>
+          </select>
+        </div>
+
+        <div class="form-group date-range">
+          <label for="videoStartDate">촬영 날짜:</label>
+          <div class="date-inputs">
+            <input type="date" id="videoStartDate">
+            <span>~</span>
+            <input type="date" id="videoEndDate">
+          </div>
+        </div>
+
+        <div class="form-group button-group">
+          <button type="submit" id="videoSearchBtn">검색</button>
+          <button type="button" id="videoResetBtn" class="reset-btn">초기화</button>
+        </div>
+      </form>
+    </div>
+
+    <div class="section">
+      <h2>이미지 정보 조회</h2>
+
+      <form class="search-form" id="imageSearchForm">
+        <div class="form-group">
+          <label for="title">영상 제목:</label>
+          <select id="title">
+            <option value="">전체</option>
+          </select>
+        </div>
+
+        <div class="form-group">
+          <label for="location">촬영 위치:</label>
+          <select id="location">
+            <option value="">전체</option>
+            <option value="강남구">강남구</option>
+            <option value="강동구">강동구</option>
+            <option value="강북구">강북구</option>
+            <option value="강서구">강서구</option>
+            <option value="관악구">관악구</option>
+            <option value="광진구">광진구</option>
+            <option value="구로구">구로구</option>
+            <option value="금천구">금천구</option>
+            <option value="노원구">노원구</option>
+            <option value="도봉구">도봉구</option>
+            <option value="동대문구">동대문구</option>
+            <option value="동작구">동작구</option>
+            <option value="마포구">마포구</option>
+            <option value="서대문구">서대문구</option>
+            <option value="서초구">서초구</option>
+            <option value="성동구">성동구</option>
+            <option value="성북구">성북구</option>
+            <option value="송파구">송파구</option>
+            <option value="양천구">양천구</option>
+            <option value="영등포구">영등포구</option>
+            <option value="용산구">용산구</option>
+            <option value="은평구">은평구</option>
+            <option value="종로구">종로구</option>
+            <option value="중구">중구</option>
+            <option value="중랑구">중랑구</option>
+          </select>
+        </div>
+
+        <div class="form-group">
+          <label for="damageType">손상 유형:</label>
+          <select id="damageType">
+            <option value="">전체</option>
+            <option value="1-1-1.균열-길이(Crack-Longitudinal,CL)">1-1-1.균열-길이(Crack-Longitudinal,CL)</option>
+            <option value="1-1-2.균열-원주(Crack-Circumferential,CC)">1-1-2.균열-원주(Crack-Circumferential,CC)</option>
+            <option value="1-2.표면손상(Surface-Damage,SD)">1-2.표면손상(Surface-Damage,SD)</option>
+            <option value="1-3.파손(Broken-Pipe,BK)">1-3.파손(Broken-Pipe,BK)</option>
+            <option value="1-4.연결관-돌출(Lateral-Protruding,LP)">1-4.연결관-돌출(Lateral-Protruding,LP)</option>
+            <option value="1-5.이음부-손상(Joint-Faulty,JF)">1-5.이음부-손상(Joint-Faulty,JF)</option>
+            <option value="1-6.이음부-단차(Joint-Displaced,JD)">1-6.이음부-단차(Joint-Displaced,JD)</option>
+            <option value="1-7.토사퇴적(Deposits-Silty,DS)">1-7.토사퇴적(Deposits-Silty,DS)</option>
+            <option value="1-8.기타결함(Etc,ETC)">1-8.기타결함(Etc,ETC)</option>
+          </select>
+        </div>
+
+        <div class="form-group date-range">
+          <label for="startDate">촬영 날짜:</label>
+          <div class="date-inputs">
+            <input type="date" id="startDate" placeholder="시작일" />
+            <span>~</span>
+            <input type="date" id="endDate" placeholder="종료일" />
+          </div>
+        </div>
+
+        <div class="form-group button-group">
+          <button type="submit" id="searchBtn">검색</button>
+          <button type="button" id="imageResetBtn" class="reset-btn">초기화</button>
+        </div>
+      </form>
+    </div>
+  </div>
+
+  <script>
+    // 전역 변수
+    let currentVideoPage = 1;
+    let currentImagePage = 1;
+    let itemsPerPage = 10;
+
+    // 페이지 로드시 초기화
+    document.addEventListener('DOMContentLoaded', function () {
+      loadDropdownOptions();
+      loadVideos(1);
+      loadImages(1);
+
+      // 폼 이벤트 리스너 추가
+      setupFormEventListeners();
+    });
+
+    // 폼 이벤트 리스너 설정
+    function setupFormEventListeners() {
+      // 영상 검색 폼 이벤트
+      const videoForm = document.getElementById('videoSearchForm');
+      videoForm.addEventListener('submit', function(e) {
+        e.preventDefault();
+        loadVideos(1);
+      });
+
+      // 영상 초기화 버튼 이벤트
+      const videoResetBtn = document.getElementById('videoResetBtn');
+      videoResetBtn.addEventListener('click', function(e) {
+        e.preventDefault();
+        resetVideoFilters();
+      });
+
+      // 이미지 검색 폼 이벤트
+      const imageForm = document.getElementById('imageSearchForm');
+      imageForm.addEventListener('submit', function(e) {
+        e.preventDefault();
+        loadImages(1);
+      });
+
+      // 이미지 초기화 버튼 이벤트
+      const imageResetBtn = document.getElementById('imageResetBtn');
+      imageResetBtn.addEventListener('click', function(e) {
+        e.preventDefault();
+        resetImageFilters();
+      });
+    }
+
+    // 드롭다운 옵션 로드 (영상 제목만 동적으로 로드)
+    async function loadDropdownOptions() {
+      try {
+        const res = await fetch('/api/options');
+        const data = await res.json();
+
+        // 영상 제목만 동적으로 로드 (위치와 손상유형은 하드코딩됨)
+        data.titles.forEach(title => {
+          const opt1 = document.createElement('option');
+          opt1.value = title;
+          opt1.textContent = title;
+          document.getElementById('videoTitle').appendChild(opt1);
+
+          const opt2 = document.createElement('option');
+          opt2.value = title;
+          opt2.textContent = title;
+          document.getElementById('title').appendChild(opt2);
+        });
+      } catch (err) {
+        console.error('옵션 로딩 실패:', err);
+      }
+    }
+
+    // 날짜 형식 변환 함수 (GMT -> YYYY-MM-DD)
+    function formatDate(dateString) {
+      if (!dateString) return '정보 없음';
+
+      try {
+        const date = new Date(dateString);
+        const year = date.getFullYear();
+        const month = String(date.getMonth() + 1).padStart(2, '0');
+        const day = String(date.getDate()).padStart(2, '0');
+        return `${year}-${month}-${day}`;
+      } catch (error) {
+        return '정보 없음';
+      }
+    }
+
+    // 영상 정보 로드
+    function loadVideos(page = 1) {
+      currentVideoPage = page;
+      const title = document.getElementById('videoTitle').value;
+      const location = document.getElementById('videoLocation').value;
+      const startDate = document.getElementById('videoStartDate').value;
+      const endDate = document.getElementById('videoEndDate').value;
+
+      let url = `/api/videos?page=${page}&per_page=${itemsPerPage}`;
+      if (title) url += `&title=${encodeURIComponent(title)}`;
+      if (location) url += `&location=${encodeURIComponent(location)}`;
+      if (startDate) url += `&start_date=${encodeURIComponent(startDate)}`;
+      if (endDate) url += `&end_date=${encodeURIComponent(endDate)}`;
+
+      console.log('영상 검색 URL:', url); // 디버깅용
+
+      fetch(url)
+        .then(res => res.json())
+        .then(data => {
+          displayVideos(data);
+        })
+        .catch(err => {
+          console.error('영상 로딩 오류:', err);
+        });
+    }
+
+    // 영상 목록 표시 (상태 컬럼 제거 및 날짜 형식 변경)
+    function displayVideos(data) {
+      const section = document.querySelector('.section:first-child');
+
+      // 기존 결과 영역이 있으면 제거
+      const existingResults = section.querySelector('.video-results');
+      if (existingResults) {
+        existingResults.remove();
+      }
+
+      // 새로운 결과 영역 생성
+      const resultsDiv = document.createElement('div');
+      resultsDiv.className = 'video-results';
+      resultsDiv.innerHTML = `
+        <hr style="margin: 20px 0;">
+        <h3>검색 결과 (총 ${data.pagination.total}개)</h3>
+        <div class="results-container">
+          <div class="video-list"></div>
+          <div class="video-pagination"></div>
+        </div>
+      `;
+
+      section.appendChild(resultsDiv);
+
+      const videoList = resultsDiv.querySelector('.video-list');
+
+      if (!data.videos || data.videos.length === 0) {
+        videoList.innerHTML = '<p class="no-result">해당 영상이 없습니다.</p>';
+        return;
+      }
+
+      // 비디오 목록을 테이블 형태로 표시 (상태 컬럼 제거)
+      let tableHtml = `
+        <table class="results-table">
+          <thead>
+            <tr>
+              <th>영상 제목</th>
+              <th>촬영 위치</th>
+              <th>촬영 날짜</th>
+              <th>손상 이미지 수</th>
+              <th style="text-align: center;">조회</th>
+            </tr>
+          </thead>
+          <tbody>
+      `;
+
+      data.videos.forEach(video => {
+        tableHtml += `
+          <tr>
+            <td>${video.title}</td>
+            <td>${video.location}</td>
+            <td>${formatDate(video.recorded_date)}</td>
+            <td>${video.damage_image_count || 0}개</td>
+            <td style="text-align: center;"><button class="view-btn" onclick="openVideoPopup('${video.video_id}')">조회</button></td>
+          </tr>
+        `;
+      });
+
+      tableHtml += '</tbody></table>';
+      videoList.innerHTML = tableHtml;
+
+      createVideoPagination(data.pagination, resultsDiv.querySelector('.video-pagination'));
+    }
+
+    // 영상 페이지네이션 생성
+    function createVideoPagination(pagination, container) {
+      container.innerHTML = '';
+      if (pagination.pages <= 1) return;
+
+      const startPage = Math.max(1, pagination.page - 3);
+      const endPage = Math.min(pagination.pages, pagination.page + 3);
+
+      if (startPage > 1) {
+        addVideoPaginationButton(container, 1, '«');
+        if (startPage > 2) addVideoPaginationButton(container, null, '...');
+      }
+
+      for (let i = startPage; i <= endPage; i++) {
+        addVideoPaginationButton(container, i, i.toString(), i === pagination.page);
+      }
+
+      if (endPage < pagination.pages) {
+        if (endPage < pagination.pages - 1) addVideoPaginationButton(container, null, '...');
+        addVideoPaginationButton(container, pagination.pages, '»');
+      }
+    }
+
+    // 영상 페이지네이션 버튼 추가
+    function addVideoPaginationButton(container, page, text, isActive = false) {
+      const button = document.createElement('button');
+      button.textContent = text;
+
+      if (page !== null) {
+        button.onclick = () => loadVideos(page);
+      } else {
+        button.disabled = true;
+      }
+
+      if (isActive) button.classList.add('active');
+      container.appendChild(button);
+    }
+
+    // 이미지 정보 로드
+    function loadImages(page = 1) {
+      currentImagePage = page;
+      const title = document.getElementById('title').value;
+      const location = document.getElementById('location').value;
+      const damageType = document.getElementById('damageType').value;
+      const startDate = document.getElementById('startDate').value;
+      const endDate = document.getElementById('endDate').value;
+
+      let url = `/api/images?page=${page}&per_page=${itemsPerPage}`;
+      if (title) url += `&title=${encodeURIComponent(title)}`;
+      if (location) url += `&location=${encodeURIComponent(location)}`;
+      if (damageType) url += `&damage_type=${encodeURIComponent(damageType)}`;
+      if (startDate) url += `&start_date=${encodeURIComponent(startDate)}`;
+      if (endDate) url += `&end_date=${encodeURIComponent(endDate)}`;
+
+      console.log('이미지 검색 URL:', url); // 디버깅용
+
+      fetch(url)
+        .then(res => res.json())
+        .then(data => {
+          console.log('이미지 검색 결과:', data); // 디버깅용
+          displayImages(data);
+        })
+        .catch(err => {
+          console.error('이미지 로딩 오류:', err);
+        });
+    }
+
+    // 이미지 목록 표시 (테이블 형태로 변경)
+    function displayImages(data) {
+      const section = document.querySelector('.section:last-child');
+
+      // 기존 결과 영역이 있으면 제거
+      const existingResults = section.querySelector('.image-results');
+      if (existingResults) {
+        existingResults.remove();
+      }
+
+      // 새로운 결과 영역 생성
+      const resultsDiv = document.createElement('div');
+      resultsDiv.className = 'image-results';
+      resultsDiv.innerHTML = `
+        <hr style="margin: 20px 0;">
+        <h3>검색 결과 (총 ${data.pagination.total}개)</h3>
+        <div class="results-container">
+          <div class="image-list"></div>
+          <div class="image-pagination"></div>
+        </div>
+      `;
+
+      section.appendChild(resultsDiv);
+
+      const imageList = resultsDiv.querySelector('.image-list');
+
+      if (!data.images || data.images.length === 0) {
+        imageList.innerHTML = '<p class="no-result">해당 이미지가 없습니다.</p>';
+        return;
+      }
+
+      // 이미지 목록을 테이블 형태로 표시
+      let tableHtml = `
+        <table class="results-table">
+          <thead>
+            <tr>
+              <th>영상 제목</th>
+              <th>촬영 위치</th>
+              <th>촬영 날짜</th>
+              <th>이미지 제목</th>
+              <th>손상 유형</th>
+              <th style="text-align: center;">조회</th>
+            </tr>
+          </thead>
+          <tbody>
+      `;
+
+      data.images.forEach(img => {
+        tableHtml += `
+          <tr>
+            <td>${img.video_title || '정보 없음'}</td>
+            <td>${img.location || '정보 없음'}</td>
+            <td>${formatDate(img.recorded_date)}</td>
+            <td>${img.image_title}</td>
+            <td>${img.damage_type || '정보 없음'}</td>
+            <td style="text-align: center;"><button class="view-btn" onclick="openImagePopup('${img.image_id}')">조회</button></td>
+
+          </tr>
+        `;
+      });
+
+      tableHtml += '</tbody></table>';
+      imageList.innerHTML = tableHtml;
+
+      createImagePagination(data.pagination, resultsDiv.querySelector('.image-pagination'));
+    }
+
+    // 이미지 페이지네이션 생성
+    function createImagePagination(pagination, container) {
+      container.innerHTML = '';
+      if (pagination.pages <= 1) return;
+
+      const startPage = Math.max(1, pagination.page - 3);
+      const endPage = Math.min(pagination.pages, pagination.page + 3);
+
+      if (startPage > 1) {
+        addImagePaginationButton(container, 1, '«');
+        if (startPage > 2) addImagePaginationButton(container, null, '...');
+      }
+
+      for (let i = startPage; i <= endPage; i++) {
+        addImagePaginationButton(container, i, i.toString(), i === pagination.page);
+      }
+
+      if (endPage < pagination.pages) {
+        if (endPage < pagination.pages - 1) addImagePaginationButton(container, null, '...');
+        addImagePaginationButton(container, pagination.pages, '»');
+      }
+    }
+
+    // 이미지 페이지네이션 버튼 추가
+    function addImagePaginationButton(container, page, text, isActive = false) {
+      const button = document.createElement('button');
+      button.textContent = text;
+
+      if (page !== null) {
+        button.onclick = () => loadImages(page);
+      } else {
+        button.disabled = true;
+      }
+
+      if (isActive) button.classList.add('active');
+      container.appendChild(button);
+    }
+
+    // 필터 초기화 함수
+    function resetVideoFilters() {
+      document.getElementById('videoTitle').value = '';
+      document.getElementById('videoLocation').value = '';
+      document.getElementById('videoStartDate').value = '';
+      document.getElementById('videoEndDate').value = '';
+      loadVideos(1);
+    }
+
+    function resetImageFilters() {
+      document.getElementById('title').value = '';
+      document.getElementById('location').value = '';
+      document.getElementById('damageType').value = '';
+      document.getElementById('startDate').value = '';
+      document.getElementById('endDate').value = '';
+      loadImages(1);
+    }
+
+    // 기존 함수들과의 호환성을 위한 래퍼 함수
+    function filterImages(page) {
+      loadImages(page);
+    }
+
+    function resetFilters() {
+      resetImageFilters();
+    }
+
+    function openVideoPopup(videoId) {
+      const width = 1000;
+      const height = 700;
+      const left = (window.screen.width - width) / 2;
+      const top = (window.screen.height - height) / 2;
+
+      window.open(
+        `/edit_video.html?id=${videoId}`,
+        'editVideo',
+        `width=${width},height=${height},left=${left},top=${top},resizable=yes,scrollbars=yes`
+      );
+    }
+
+
+    function openImagePopup(imageId) {
+      const width = 1000;
+      const height = 700;
+      const left = (window.screen.width - width) / 2;
+      const top = (window.screen.height - height) / 2;
+
+      window.open(
+        `/edit_image.html?id=${imageId}`,
+        'editImage',
+        `width=${width},height=${height},left=${left},top=${top},resizable=yes,scrollbars=yes`
+      );
+    }
+
+
+  </script>
+</body>
+</html>
+
+{% endblock %}
+

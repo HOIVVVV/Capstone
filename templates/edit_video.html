@@ -1,0 +1,452 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>영상 정보 수정</title>
+    <style>
+        * {
+            box-sizing: border-box;
+            margin: 0;
+            padding: 0;
+            font-family: Arial, sans-serif;
+        }
+
+        body {
+            background-color: #f5f5f5;
+        }
+
+        .container {
+            width: 100%;
+            max-width: 600px;
+            margin: 20px auto;
+            padding: 20px;
+            background-color: #fff;
+            border-radius: 8px;
+            box-shadow: 0 2px 10px rgba(0, 0, 0, 0.1);
+        }
+
+        h1 {
+            text-align: center;
+            margin-bottom: 20px;
+            color: #333;
+        }
+
+        .form-group {
+            margin-bottom: 20px;
+        }
+
+        label {
+            display: block;
+            margin-bottom: 5px;
+            font-weight: bold;
+            color: #555;
+        }
+
+        input, select {
+            width: 100%;
+            padding: 10px;
+            border: 1px solid #ddd;
+            border-radius: 4px;
+            font-size: 16px;
+        }
+
+        input:focus, select:focus {
+            outline: none;
+            border-color: #4d90fe;
+            box-shadow: 0 0 5px rgba(77, 144, 254, 0.5);
+        }
+
+        .button-group {
+            display: flex;
+            justify-content: space-between;
+            margin-top: 30px;
+        }
+
+        .button {
+            padding: 10px 20px;
+            border: none;
+            border-radius: 4px;
+            font-size: 16px;
+            cursor: pointer;
+            transition: background-color 0.3s;
+        }
+
+        .save-button {
+            background-color: #4CAF50;
+            color: white;
+        }
+
+        .save-button:hover {
+            background-color: #45a049;
+        }
+
+        .delete-button {
+            background-color: #f44336;
+            color: white;
+        }
+
+        .delete-button:hover {
+            background-color: #d32f2f;
+        }
+
+        .cancel-button {
+            background-color: #f0f0f0;
+            color: #333;
+        }
+
+        .cancel-button:hover {
+            background-color: #e0e0e0;
+        }
+
+        .error-message {
+            color: #f44336;
+            font-size: 14px;
+            margin-top: 5px;
+            display: none;
+        }
+
+        /* 확인 모달 스타일 */
+        .modal {
+            display: none;
+            position: fixed;
+            z-index: 1000;
+            left: 0;
+            top: 0;
+            width: 100%;
+            height: 100%;
+            background-color: rgba(0, 0, 0, 0.5);
+        }
+
+        .modal-content {
+            position: relative;
+            background-color: #fff;
+            margin: 15% auto;
+            padding: 20px;
+            border-radius: 8px;
+            max-width: 400px;
+            text-align: center;
+        }
+
+        .modal-title {
+            margin-bottom: 15px;
+            font-size: 20px;
+            color: #333;
+        }
+
+        .modal-buttons {
+            display: flex;
+            justify-content: center;
+            gap: 20px;
+            margin-top: 20px;
+        }
+
+        /* 로딩 스피너 */
+        .spinner {
+            display: none;
+            width: 40px;
+            height: 40px;
+            margin: 20px auto;
+            border: 4px solid #f3f3f3;
+            border-top: 4px solid #3498db;
+            border-radius: 50%;
+            animation: spin 1s linear infinite;
+        }
+
+        @keyframes spin {
+            0% { transform: rotate(0deg); }
+            100% { transform: rotate(360deg); }
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <h1>영상 정보 수정</h1>
+
+        <div class="spinner" id="spinner"></div>
+
+        <div id="edit-form">
+            <div class="form-group">
+                <label for="video-title">영상 제목</label>
+                <input type="text" id="video-title" placeholder="영상 제목을 입력하세요">
+                <div class="error-message" id="title-error">영상 제목을 입력해주세요.</div>
+            </div>
+
+            <div class="form-group">
+                <label for="location">촬영 위치</label>
+                <select id="location">
+                    <option value="">선택하세요</option>
+                    <option value="강남구">강남구</option>
+                    <option value="강동구">강동구</option>
+                    <option value="강북구">강북구</option>
+                    <option value="강서구">강서구</option>
+                    <option value="관악구">관악구</option>
+                    <option value="광진구">광진구</option>
+                    <option value="구로구">구로구</option>
+                    <option value="금천구">금천구</option>
+                    <option value="노원구">노원구</option>
+                    <option value="도봉구">도봉구</option>
+                    <option value="동대문구">동대문구</option>
+                    <option value="동작구">동작구</option>
+                    <option value="마포구">마포구</option>
+                    <option value="서대문구">서대문구</option>
+                    <option value="서초구">서초구</option>
+                    <option value="성동구">성동구</option>
+                    <option value="성북구">성북구</option>
+                    <option value="송파구">송파구</option>
+                    <option value="양천구">양천구</option>
+                    <option value="영등포구">영등포구</option>
+                    <option value="용산구">용산구</option>
+                    <option value="은평구">은평구</option>
+                    <option value="종로구">종로구</option>
+                    <option value="중구">중구</option>
+                    <option value="중랑구">중랑구</option>
+                </select>
+                <div class="error-message" id="location-error">촬영 위치를 선택해주세요.</div>
+            </div>
+
+            <div class="form-group">
+                <label for="recorded-date">촬영 날짜</label>
+                <input type="date" id="recorded-date" placeholder="촬영 날짜를 선택하세요">
+                <div class="error-message" id="date-error">촬영 날짜를 선택해주세요.</div>
+            </div>
+
+            <div class="form-group">
+                <label>관련 이미지 수: <span id="image-count">0</span>개</label>
+            </div>
+
+            <div class="button-group">
+                <button class="button delete-button" id="delete-button">삭제</button>
+                <div>
+                    <button class="button cancel-button" id="cancel-button">취소</button>
+                    <button class="button save-button" id="save-button">저장</button>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- 삭제 확인 모달 -->
+    <div id="delete-modal" class="modal">
+        <div class="modal-content">
+            <h2 class="modal-title">영상 삭제 확인</h2>
+            <p>이 영상과 관련된 모든 이미지가 함께 삭제됩니다. 정말 삭제하시겠습니까?</p>
+            <div class="modal-buttons">
+                <button class="button cancel-button" id="cancel-delete">취소</button>
+                <button class="button delete-button" id="confirm-delete">삭제</button>
+            </div>
+        </div>
+    </div>
+
+    <!-- 성공 알림 모달 -->
+    <div id="success-modal" class="modal">
+        <div class="modal-content">
+            <h2 class="modal-title" id="success-title">성공</h2>
+            <p id="success-message"></p>
+            <div class="modal-buttons">
+                <button class="button save-button" id="close-success">확인</button>
+            </div>
+        </div>
+    </div>
+
+    <script>
+        // 전역 변수
+        let videoId = null;
+
+        // 페이지 로드 시 초기화
+        document.addEventListener('DOMContentLoaded', function() {
+            // URL에서 비디오 ID 가져오기
+            const urlParams = new URLSearchParams(window.location.search);
+            videoId = urlParams.get('id');
+
+            if (!videoId) {
+                showSuccessModal('오류', '영상 ID가 제공되지 않았습니다.', function() {
+                    window.close();
+                });
+                return;
+            }
+
+            // 영상 정보 로드
+            loadVideoInfo();
+
+            // 버튼 이벤트 등록
+            document.getElementById('save-button').addEventListener('click', saveVideo);
+            document.getElementById('delete-button').addEventListener('click', function() {
+                document.getElementById('delete-modal').style.display = 'block';
+            });
+            document.getElementById('cancel-button').addEventListener('click', function() {
+                window.close();
+            });
+            document.getElementById('cancel-delete').addEventListener('click', function() {
+                document.getElementById('delete-modal').style.display = 'none';
+            });
+            document.getElementById('confirm-delete').addEventListener('click', deleteVideo);
+            document.getElementById('close-success').addEventListener('click', function() {
+                document.getElementById('success-modal').style.display = 'none';
+                if (this.getAttribute('data-redirect') === 'true') {
+                    window.opener.location.reload();
+                    window.close();
+                }
+            });
+        });
+
+        // 영상 정보 로드 함수
+        function loadVideoInfo() {
+            showSpinner();
+
+            fetch(`/api/videos/${videoId}`)
+                .then(response => {
+                    if (!response.ok) {
+                        throw new Error('영상 정보를 불러오는데 실패했습니다.');
+                    }
+                    return response.json();
+                })
+                .then(data => {
+                    if (data.video) {
+                        document.getElementById('video-title').value = data.video.title || '';
+                        document.getElementById('location').value = data.video.location || '';
+                        document.getElementById('recorded-date').value = data.video.recorded_date || '';
+                        document.getElementById('image-count').textContent = data.video.damage_image_count || '0';
+                    }
+                    hideSpinner();
+                })
+                .catch(error => {
+                    console.error('Error:', error);
+                    hideSpinner();
+                    showSuccessModal('오류', '영상 정보를 불러오는데 실패했습니다.', function() {
+                        window.close();
+                    });
+                });
+        }
+
+        // 영상 저장 함수
+        function saveVideo() {
+            // 입력 유효성 검사
+            const title = document.getElementById('video-title').value.trim();
+            const location = document.getElementById('location').value;
+            const recordedDate = document.getElementById('recorded-date').value;
+
+            let isValid = true;
+
+            if (!title) {
+                document.getElementById('title-error').style.display = 'block';
+                isValid = false;
+            } else {
+                document.getElementById('title-error').style.display = 'none';
+            }
+
+            if (!location) {
+                document.getElementById('location-error').style.display = 'block';
+                isValid = false;
+            } else {
+                document.getElementById('location-error').style.display = 'none';
+            }
+
+            if (!recordedDate) {
+                document.getElementById('date-error').style.display = 'block';
+                isValid = false;
+            } else {
+                document.getElementById('date-error').style.display = 'none';
+            }
+
+            if (!isValid) {
+                return;
+            }
+
+            showSpinner();
+
+            // 서버로 데이터 전송
+            fetch(`/api/videos/${videoId}`, {
+                method: 'PUT',
+                headers: {
+                    'Content-Type': 'application/json',
+                },
+                body: JSON.stringify({
+                    title: title,
+                    location: location,
+                    recorded_date: recordedDate
+                })
+            })
+            .then(response => {
+                if (!response.ok) {
+                    throw new Error('영상 정보 업데이트에 실패했습니다.');
+                }
+                return response.json();
+            })
+            .then(data => {
+                hideSpinner();
+                showSuccessModal('성공', '영상 정보가 성공적으로 업데이트되었습니다.', function() {
+                    window.opener.location.reload();
+                    window.close();
+                });
+            })
+            .catch(error => {
+                console.error('Error:', error);
+                hideSpinner();
+                showSuccessModal('오류', '영상 정보 업데이트에 실패했습니다.');
+            });
+        }
+
+        // 영상 삭제 함수
+        function deleteVideo() {
+            showSpinner();
+            document.getElementById('delete-modal').style.display = 'none';
+
+            fetch(`/api/videos/${videoId}`, {
+                method: 'DELETE'
+            })
+            .then(response => {
+                if (!response.ok) {
+                    throw new Error('영상 삭제에 실패했습니다.');
+                }
+                return response.json();
+            })
+            .then(data => {
+                hideSpinner();
+                showSuccessModal('성공', '영상이 성공적으로 삭제되었습니다.', function() {
+                    window.opener.location.reload();
+                    window.close();
+                });
+            })
+            .catch(error => {
+                console.error('Error:', error);
+                hideSpinner();
+                showSuccessModal('오류', '영상 삭제에 실패했습니다.');
+            });
+        }
+
+        // 스피너 표시 함수
+        function showSpinner() {
+            document.getElementById('spinner').style.display = 'block';
+            document.getElementById('edit-form').style.opacity = '0.5';
+        }
+
+        // 스피너 숨김 함수
+        function hideSpinner() {
+            document.getElementById('spinner').style.display = 'none';
+            document.getElementById('edit-form').style.opacity = '1';
+        }
+
+        // 성공/오류 모달 표시 함수
+        function showSuccessModal(title, message, callback) {
+            document.getElementById('success-title').textContent = title;
+            document.getElementById('success-message').textContent = message;
+
+            const closeButton = document.getElementById('close-success');
+            if (callback) {
+                closeButton.setAttribute('data-redirect', 'true');
+                closeButton.onclick = function() {
+                    document.getElementById('success-modal').style.display = 'none';
+                    callback();
+                };
+            } else {
+                closeButton.setAttribute('data-redirect', 'false');
+                closeButton.onclick = function() {
+                    document.getElementById('success-modal').style.display = 'none';
+                };
+            }
+
+            document.getElementById('success-modal').style.display = 'block';
+        }
+    </script>
+</body>
+</html>
