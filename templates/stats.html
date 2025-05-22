@@ -1,6 +1,6 @@
 {% extends "base.html" %}
-{% set active_page = 'dashboard' %}
-{% block title %}대시보드{% endblock %}
+{% set active_page = 'stats' %}
+{% block title %}손상 통계{% endblock %}
 {% block content %}
 <!DOCTYPE html>
 <html lang="ko">
@@ -13,8 +13,6 @@
   <link rel="stylesheet" href="https://stackpath.bootstrapcdn.com/bootstrap/4.5.2/css/bootstrap.min.css">
   <script src="https://kit.fontawesome.com/a076d05399.js" crossorigin="anonymous"></script>
 
-  <!-- Google Fonts -->
-  <link href="https://fonts.googleapis.com/css2?family=Noto+Sans+KR&display=swap" rel="stylesheet">
 
   <style>
     html, body {
@@ -25,23 +23,6 @@
     #wrapper {
       display: flex;
       height: 100%;
-    }
-    .sidebar {
-      width: 240px;
-      min-height: 100%;
-      background-color: #dc3545;
-      color: white;
-    }
-    .sidebar .list-group-item {
-      background-color: #dc3545;
-      border: none;
-      color: white;
-    }
-    .sidebar .list-group-item:hover {
-      background-color: #dc3545;
-    }
-    .navbar input[type="search"] {
-      width: 320px;
     }
     .table td, .table th {
       font-size: 14px;

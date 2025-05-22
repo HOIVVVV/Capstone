@@ -9,14 +9,14 @@
 
 <div class="container-fluid mt-4">
   <div class="row">
-    <!-- 손상 유형 통계 -->
-    <div class="col-md-6 mb-4">
-      <div class="card">
+    <!-- 1. 손상 유형 통계 -->
+    <div class="col-lg-6 col-md-12 mb-4">
+      <div class="card h-100">
         <div class="card-body">
           <h5 class="card-title">손상 유형 분포</h5>
-          <div style="min-height: 400px; overflow-x: auto;">
+          <div style="min-height: 300px; overflow-x: auto;">
             {% if chart_html1 %}
-              <div style="width: 100%;">{{ chart_html1|safe }}</div>
+              <div style="width: 100%">{{ chart_html1|safe }}</div>
             {% else %}
               <p class="text-muted text-center">그래프가 여기에 표시됩니다.</p>
             {% endif %}
@@ -25,14 +25,14 @@
       </div>
     </div>
 
-    <!-- 지역별 손상 빈도 -->
-    <div class="col-md-6 mb-4">
-      <div class="card">
+    <!-- 2. 지역별 손상 빈도 -->
+    <div class="col-lg-6 col-md-12 mb-4">
+      <div class="card h-100">
         <div class="card-body">
           <h5 class="card-title">지역별 손상 빈도</h5>
-          <div style="min-height: 400px; overflow-x: auto;">
+          <div style="min-height: 300px; overflow-x: auto;">
             {% if chart_html2 %}
-              <div style="width: 100%;">{{ chart_html2|safe }}</div>
+              <div style="width: 100%">{{ chart_html2|safe }}</div>
             {% else %}
               <p class="text-muted text-center">그래프가 여기에 표시됩니다.</p>
             {% endif %}
@@ -41,14 +41,14 @@
       </div>
     </div>
 
-    <!-- 손상 발생 빈도 -->
-    <div class="col-md-6 mb-4">
-      <div class="card">
+    <!-- 3. 손상 발생 빈도 -->
+    <div class="col-lg-6 col-md-12 mb-4">
+      <div class="card h-100">
         <div class="card-body">
           <h5 class="card-title">손상 발생 빈도</h5>
-          <div style="min-height: 400px; overflow-x: auto;">
+          <div style="min-height: 300px; overflow-x: auto;">
             {% if chart_html3 %}
-              <div style="width: 100%;">{{ chart_html3|safe }}</div>
+              <div style="width: 100%">{{ chart_html3|safe }}</div>
             {% else %}
               <p class="text-muted text-center">그래프가 여기에 표시됩니다.</p>
             {% endif %}
@@ -57,13 +57,13 @@
       </div>
     </div>
 
-    <!-- 검사 결과 요약 -->
-    <div class="col-md-6 mb-4">
-      <div class="card">
+    <!-- 4. 검사 결과 요약 -->
+    <div class="col-lg-6 col-md-12 mb-4">
+      <div class="card h-100">
         <div class="card-body">
           <h5 class="card-title">검사 결과 요약</h5>
           <p class="text-muted">최근 하수관로 검사 기록</p>
-          <table class="table">
+          <table class="table table-sm">
             <thead>
               <tr>
                 <th>시간</th>
@@ -77,9 +77,7 @@
                 <td>{{ item.time }}</td>
                 <td>{{ item.label }}</td>
                 <td>
-                  <button onclick="openPreviewModal('/static/{{ item.file }}')" class="btn btn-sm btn-outline-primary">
-                    🔍
-                  </button>
+                  <button onclick="openPreviewModal('/static/{{ item.file }}')" class="btn btn-sm btn-outline-primary">🔍</button>
                 </td>
               </tr>
               {% endfor %}
@@ -88,7 +86,6 @@
               {% endif %}
             </tbody>
           </table>
-          <p class="text-muted small"><i class="fa fa-history"></i> 최신 기준</p>
         </div>
       </div>
     </div>

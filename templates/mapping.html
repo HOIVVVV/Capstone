@@ -1,167 +1,114 @@
 {% extends "base.html" %}
-{% set active_page = 'dashboard' %}
-{% block title %}대시보드{% endblock %}
+{% set active_page = 'mapping' %}
+{% block title %}손상도 매핑{% endblock %}
+
 {% block content %}
-<!DOCTYPE html>
-<html lang="ko">
-<head>
-  <meta charset="UTF-8">
-  <title>손상 통계 시각화</title>
-  <meta name="viewport" content="width=device-width, initial-scale=1">
+<style>
+  .card {
+    background-color: white;
+    border-radius: 8px;
+    box-shadow: 0 2px 4px rgba(0,0,0,0.1);
+    padding: 15px;
+    margin-bottom: 20px;
+  }
 
-  <!-- Bootstrap & FontAwesome CDN -->
-  <link rel="stylesheet" href="https://stackpath.bootstrapcdn.com/bootstrap/4.5.2/css/bootstrap.min.css">
-  <script src="https://kit.fontawesome.com/a076d05399.js" crossorigin="anonymous"></script>
+  .form-control, .btn {
+    border-radius: 4px;
+  }
 
-  <!-- Google Fonts -->
-  <link href="https://fonts.googleapis.com/css2?family=Noto+Sans+KR&display=swap" rel="stylesheet">
+  .form-group label {
+    font-weight: 600;
+  }
 
-  <style>
-    html, body {
-      height: 100%;
-      font-family: 'Noto Sans KR', sans-serif;
-      background-color: #f8f9fa;
-    }
-    #wrapper {
-      display: flex;
-      height: 100vh;
-    }
-    .sidebar {
-      width: 240px;
-      min-height: 100vh;
-      background-color: #dc3545;
-      color: white;
-    }
-    .sidebar .list-group-item {
-      background-color: #dc3545;
-      border: none;
-      color: white;
-    }
-    .sidebar .list-group-item:hover {
-      background-color: #dc3545;
-    }
-    .navbar input[type="search"] {
-      width: 320px;
-    }
-    .table td, .table th {
-      font-size: 14px;
-    }
-    .card {
-      background-color: white;
-      border-radius: 8px;
-      box-shadow: 0 2px 4px rgba(0,0,0,0.1);
-      padding: 15px;
-      margin-bottom: 20px;
-    }
-    .form-control, .btn {
-      border-radius: 4px;
-    }
-    .form-group label {
-      font-weight: 600;
-    }
+  #chart-result {
+    height: 800px;
+    width: 70%;
+    border: 1px solid #dee2e6;
+    border-radius: 8px;
+    background-color: white;
+    padding: 15px;
+    overflow: auto;
+    margin-right: 20px;
+  }
 
-    #chart-result {
-      height: 800px;
-      width: 70%;
-      border: 1px solid #dee2e6;
-      border-radius: 8px;
-      background-color: white;
-      padding: 15px;
-      overflow: auto;
-      margin-right: 20px;
-    }
+  #filter-container {
+    width: 30%;
+    display: flex;
+    flex-direction: column;
+    justify-content: space-between;
+  }
 
-    #filter-container {
-      width: 30%;
-      display: flex;
-      flex-direction: row;
-      justify-content: space-between;
-    }
+  #damage-filter, #location-filter {
+    width: 100%;
+    border: 1px solid #dee2e6;
+    border-radius: 8px;
+    background-color: white;
+    padding: 10px;
+    overflow: auto;
+    margin-bottom: 20px;
+  }
+</style>
 
-    #damage-filter, #location-filter {
-      width: 100%;
-      height: 100;
-      border: 1px solid #dee2e6;
-      border-radius: 8px;
-      background-color: white;
-      padding: 10px;
-      overflow: auto;
-      margin-bottom: 20px;
-    }
-  </style>
+<div class="container-fluid mt-4">
+  <h2 class="mb-4">손상 통계 시각화</h2>
+  <form method="POST" action="/generate_chart">
+    <!-- 날짜 선택 -->
+    <div class="form-group">
+      <label>시작 날짜:</label>
+      <input type="date" name="start_date" class="form-control d-inline-block w-auto" value="{{ start_date or min_date }}" required>
+      <label class="ml-3">종료 날짜:</label>
+      <input type="date" name="end_date" class="form-control d-inline-block w-auto" value="{{ end_date or max_date }}" required>
+    </div>
 
-  <script>
-  </script>
-</head>
-<body>
-  <div class="d-flex" id="wrapper">
-    <!-- Page Content -->
-    <div id="page-content-wrapper" class="w-100">
-      <div class="container-fluid mt-4">
-        <h2 class="mb-4">손상 통계 시각화</h2>
-        <form method="POST" action="/generate_chart">
-          <!-- 날짜 선택 -->
-          <div class="form-group">
-            <label>시작 날짜:</label>
-            <input type="date" name="start_date" class="form-control d-inline-block w-auto" value="{{ start_date or min_date }}" required>
-            <label class="ml-3">종료 날짜:</label>
-            <input type="date" name="end_date" class="form-control d-inline-block w-auto" value="{{ end_date or max_date }}" required>
-          </div>
+    <!-- 그래프 종류 -->
+    <div class="form-group">
+      <label>그래프 종류 선택:</label>
+      <select name="chart_type" class="form-control w-25 d-inline-block" onchange="onChartTypeChange()">
+        <option value="map" {% if chart_type == 'map' %}selected{% endif %}>Map 차트</option>
+      </select>
+      <button type="submit" class="btn btn-primary ml-3">그래프 생성</button>
+    </div>
 
-          <!-- 그래프 종류 -->
-          <div class="form-group">
-            <label>그래프 종류 선택:</label>
-            <select name="chart_type" class="form-control w-25 d-inline-block" onchange="onChartTypeChange()">
-              <option value="map" {% if chart_type == 'map' %}selected{% endif %}>Map 차트</option>
-            </select>
-            <button type="submit" class="btn btn-primary ml-3">그래프 생성</button>
-          </div>
+    <!-- 차트 + 필터 박스 나란히 -->
+    <div class="d-flex mb-4">
+      <!-- 차트 결과 -->
+      <div id="chart-result">
+        {% if chart_html %}
+          {{ chart_html|safe }}
+        {% else %}
+          <p style="text-align: center; line-height: 470px; color: #999;">그래프가 여기에 표시됩니다.</p>
+        {% endif %}
+      </div>
 
-          <!-- 차트 + 필터 박스 나란히 -->
-          <div class="d-flex mb-4">
-            <!-- 차트 결과 -->
-            <div id="chart-result">
-              {% if chart_html %}
-                {{ chart_html|safe }}
-              {% else %}
-                <p style="text-align: center; line-height: 470px; color: #999;">그래프가 여기에 표시됩니다.</p>
-              {% endif %}
+      <!-- 필터 박스 -->
+      <div id="filter-container">
+        <!-- 손상 유형 -->
+        <div id="damage-filter">
+          <label><strong>손상 유형</strong></label><br>
+          {% for dtype in damage_types %}
+            {% set input_id = 'dtype_' ~ loop.index %}
+            <div>
+              <input type="checkbox" id="{{ input_id }}" class="damage-type-checkbox" name="damage_type" value="{{ dtype }}"
+              {% if dtype in selected_damage_types %}checked{% endif %}>
+              <label for="{{ input_id }}">{{ dtype }}</label>
             </div>
+          {% endfor %}
+        </div>
 
-            <!-- 필터 박스 묶음 -->
-            <div id="filter-container">
-              <!-- 손상 유형 -->
-              <div id="damage-filter">
-                <label><strong>손상 유형</strong></label><br>
-                {% for dtype in damage_types %}
-                  {% set input_id = 'dtype_' ~ loop.index %}
-                  <div>
-                    <input type="checkbox" id="{{ input_id }}" class="damage-type-checkbox" name="damage_type" value="{{ dtype }}"
-                    {% if dtype in selected_damage_types %}checked{% endif %}>
-                    <label for="{{ input_id }}">{{ dtype }}</label>
-                  </div>
-                {% endfor %}
-              </div>
-
-              <!-- 촬영 위치 -->
-              <div id="location-filter">
-                <label><strong>촬영 위치</strong></label><br>
-                {% for loc in locations %}
-                  {% set loc_id = 'loc_' ~ loop.index %}
-                  <div>
-                    <input type="checkbox" id="{{ loc_id }}" name="location" value="{{ loc }}"
-                    {% if loc in selected_locations %}checked{% endif %}>
-                    <label for="{{ loc_id }}">{{ loc }}</label>
-                  </div>
-                {% endfor %}
-              </div>
-
+        <!-- 촬영 위치 -->
+        <div id="location-filter">
+          <label><strong>촬영 위치</strong></label><br>
+          {% for loc in locations %}
+            {% set loc_id = 'loc_' ~ loop.index %}
+            <div>
+              <input type="checkbox" id="{{ loc_id }}" name="location" value="{{ loc }}"
+              {% if loc in selected_locations %}checked{% endif %}>
+              <label for="{{ loc_id }}">{{ loc }}</label>
             </div>
-          </div>
-        </form>
+          {% endfor %}
+        </div>
       </div>
     </div>
-  </div>
-</body>
-</html>
+  </form>
+</div>
 {% endblock %}
