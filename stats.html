@@ -76,7 +76,6 @@
 
     #damage-filter, #location-filter {
       width: 100%;
-      height: 100;
       border: 1px solid #dee2e6;
       border-radius: 8px;
       background-color: white;
@@ -98,6 +97,27 @@
       }
     }
 
+    // 전체선택 기능 추가
+    window.addEventListener('DOMContentLoaded', () => {
+      // 전체 선택 체크 여부 초기화
+      const damageCheckboxes = document.querySelectorAll('.damage-type-checkbox');
+      document.getElementById('select-all-damage').checked = [...damageCheckboxes].every(cb => cb.checked);
+
+      const locationCheckboxes = document.querySelectorAll('.location-checkbox');
+      document.getElementById('select-all-location').checked = [...locationCheckboxes].every(cb => cb.checked);
+
+      // 전체 선택/해제 이벤트
+      document.getElementById('select-all-damage').addEventListener('change', function () {
+        const checked = this.checked;
+        damageCheckboxes.forEach(cb => cb.checked = checked);
+      });
+
+      document.getElementById('select-all-location').addEventListener('change', function () {
+        const checked = this.checked;
+        locationCheckboxes.forEach(cb => cb.checked = checked);
+      });
+    });
+
     window.onload = onChartTypeChange;
   </script>
 </head>
@@ -107,9 +127,9 @@
     <div class="sidebar">
       <div class="sidebar-heading px-3 pt-4 font-weight-bold">하수관로 관리 시스템</div>
       <div class="list-group list-group-flush">
-        <a href="/dash" class="list-group-item"><i class="fas fa-tachometer-alt mr-2"></i> 대시보드</a>
+        <a href="/front" class="list-group-item"><i class="fas fa-tachometer-alt mr-2"></i> 대시보드</a>
         <a href="#" class="list-group-item"><i class="fas fa-search mr-2"></i> 관로 점검 결과</a>
-        <a href="/stats" class="list-group-item"><i class="fas fa-chart-pie mr-2"></i> 손상 통계</a>
+        <a href="/" class="list-group-item"><i class="fas fa-chart-pie mr-2"></i> 손상 통계</a>
         <a href="/mapping" class="list-group-item"><i class="fas fa-book mr-2"></i> 손상도 매핑</a>
         <a href="#" class="list-group-item"><i class="fas fa-chart-bar mr-2"></i> 손상 분석</a>
       </div>
@@ -172,6 +192,10 @@
               <!-- 손상 유형 -->
               <div id="damage-filter">
                 <label><strong>손상 유형</strong></label><br>
+                <div>
+                  <input type="checkbox" id="select-all-damage">
+                  <label for="select-all-damage"><em>전체 선택</em></label>
+                </div>
                 {% for dtype in damage_types %}
                   {% set input_id = 'dtype_' ~ loop.index %}
                   <div>
@@ -185,16 +209,19 @@
               <!-- 촬영 위치 -->
               <div id="location-filter">
                 <label><strong>촬영 위치</strong></label><br>
+                <div>
+                  <input type="checkbox" id="select-all-location">
+                  <label for="select-all-location"><em>전체 선택</em></label>
+                </div>
                 {% for loc in locations %}
                   {% set loc_id = 'loc_' ~ loop.index %}
                   <div>
-                    <input type="checkbox" id="{{ loc_id }}" name="location" value="{{ loc }}"
+                    <input type="checkbox" id="{{ loc_id }}" class="location-checkbox" name="location" value="{{ loc }}"
                     {% if loc in selected_locations %}checked{% endif %}>
                     <label for="{{ loc_id }}">{{ loc }}</label>
                   </div>
                 {% endfor %}
               </div>
-
             </div>
           </div>
         </form>
