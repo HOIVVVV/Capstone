@@ -25,12 +25,12 @@ else:
 plt.rcParams['axes.unicode_minus'] = False
 
 app = Flask(__name__)
-app.config['SQLALCHEMY_DATABASE_URI'] = 'mysql+pymysql://root:autoset@localhost:3307/capstone'
+app.config['SQLALCHEMY_DATABASE_URI'] = 'mysql+pymysql://root:autoset@localhost/capstone'
 app.config['SQLALCHEMY_TRACK_MODIFICATIONS'] = False
 db = SQLAlchemy(app)
 
 #경로설정
-path = "stats.html"
+path = "upload.html"
 
 class DamageImage(db.Model):
     __tablename__ = 'damage_images'
@@ -51,8 +51,8 @@ class Video(db.Model):
     
 
 
-@app.route('/stats', methods=['GET'])
-def stats_page():
+@app.route('/', methods=['GET'])
+def index():
     damage_types = db.session.query(DamageImage.damage_type).distinct().all()
     locations = db.session.query(Video.location).distinct().all()
     
@@ -485,8 +485,8 @@ def generate_chart():
 # def front_page():
 #     return render_template('front.html')
 
-@app.route('/dash')
-def dash_page():
+@app.route('/front')
+def front_page():
     chart_type = request.form.get('chart_type')
     aggregate_unit = request.form.get('aggregate_unit')
     start_date = request.form.get('start_date')
@@ -538,22 +538,28 @@ def dash_page():
         title='Stacked Bar Chart',
         xaxis_title='위치',
         yaxis_title='건수'
+        # xaxis=dict(
+        #     tickangle=-90
+        # )
     )
     chart_html2 = fig2.to_html(full_html=False)
     
-    #line -> 손상발생빈도
-    df['recorded_date'] = pd.to_datetime(df['recorded_date'])
+    pivot = df.groupby(['location', 'damage_type']).size().unstack(fill_value=0)
 
-    #df['period'] = df['recorded_date'].dt.to_period('Q').astype(str)#분기 quarter
-    df['period'] = df['recorded_date'].dt.to_period('M').astype(str)#달 month
+    fig3 = go.Figure(data=go.Heatmap(
+        z=pivot.values,
+        x=pivot.columns,
+        y=pivot.index,
+        colorscale='YlOrRd',
+        colorbar=dict(title='건수'),
+        hoverongaps=False
+    ))
 
-    summary = df.groupby('period').size().reset_index(name='count')
-    fig3 = px.line(summary, x = 'period', y= 'count')
-    chart_html3 =  fig3.to_html(full_html=False)
+    fig3.update_layout(title='위치별 손상유형 히트맵', xaxis_title="손상 유형", yaxis_title="위치")
 
+    chart_html3 = fig3.to_html(full_html=False)
 
-
-    return render_template('dash.html', chart_html1=chart_html1,
+    return render_template('front.html', chart_html1=chart_html1,
                            chart_html2=chart_html2, chart_html3 = chart_html3)
     
     
