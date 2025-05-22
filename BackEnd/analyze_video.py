@@ -66,7 +66,7 @@ def analyze_video(video_path):
     # ✅ 본 분석 시작
     progress["step"] = "📽️ 프레임 추출 중..."
     progress["percent"] = 40
-    extract_frames(video_path, frame_output_folder, seconds_between_frames = 1)
+    extract_frames(video_path, frame_output_folder, seconds_between_frames = 2)
 
     # ✅ 이미지 예측
     progress["step"] = "🧠 이미지 분석 중..."

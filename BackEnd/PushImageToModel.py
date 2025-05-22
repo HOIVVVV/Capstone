@@ -26,7 +26,7 @@ weights = ResNeXt50_32X4D_Weights.DEFAULT
 model = resnext50_32x4d(weights=weights)
 
 #모델 클래스 로드드
-class_map = load_class_map("class_map_final.json")
+class_map = load_class_map("class_map.json")
 num_classes = max(class_map.keys()) + 1
 model.fc = torch.nn.Linear(model.fc.in_features, num_classes)
 

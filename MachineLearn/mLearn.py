@@ -25,7 +25,7 @@ from sklearn.model_selection import StratifiedShuffleSplit
 ImageFile.LOAD_TRUNCATED_IMAGES = True
 
 # Load fixed class map from JSON
-CLASS_MAP_PATH = "class_map_final.json"
+CLASS_MAP_PATH = "class_map.json"
 if os.path.exists(CLASS_MAP_PATH):
     with open(CLASS_MAP_PATH, "r", encoding="utf-8") as f:
         FIXED_CLASS_MAP = json.load(f)
@@ -203,7 +203,7 @@ def main():
     ])
 
 
-    dataset_root = "C:/Users/parkerpark/Downloads/학습 데이터 추가"
+    dataset_root = "C:/Users/parkerpark/Downloads/재분류 데이터 결과"
     corrupted_txt_path = "corrupted.txt"
     dataset = FolderBasedDataset(dataset_root, corrupted_txt_path=corrupted_txt_path)
     class_map = dataset.class_map
@@ -348,7 +348,7 @@ def main():
 
     with open(CLASS_MAP_PATH, "w", encoding="utf-8") as f:
         json.dump(class_map, f, indent=4, ensure_ascii=False)
-    print("✅ 클래스 맵 저장 완료: class_map_final.json")
+    print("✅ 클래스 맵 저장 완료: class_map.json")
 
 
 if __name__ == "__main__":
