@@ -105,12 +105,11 @@
           <div class="form-group">
             <label>그래프 종류 선택:</label>
             <select name="chart_type" class="form-control w-25 d-inline-block" onchange="onChartTypeChange()">
-              <option value="bar" {% if chart_type == 'bar' %}selected{% endif %}>Bar 그래프</option>
+              <option value="bar" {% if chart_type == 'bar' %}selected{% endif %}>Bar 차트</option>
               <option value="pie" {% if chart_type == 'pie' %}selected{% endif %}>Pie 차트</option>
               <option value="line" {% if chart_type == 'line' %}selected{% endif %}>Line 차트</option>
               <option value="heatmap" {% if chart_type == 'heatmap' %}selected{% endif %}>Heatmap 차트</option>
               <option value="stacked" {% if chart_type == 'stacked' %}selected{% endif %}>Stacked 차트</option>
-              <option value="map" {% if chart_type == 'map' %}selected{% endif %}>Map 차트</option>
             </select>
             <button type="submit" class="btn btn-primary ml-3">그래프 생성</button>
           </div>

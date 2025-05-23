@@ -110,15 +110,20 @@ def dashboard():
     )
     chart_html2 = fig2.to_html(full_html=False)
 
-    # ✅ 차트 3: line -> 손상발생빈도 (월별)
-    if not df.empty and pd.api.types.is_datetime64_any_dtype(df['recorded_date']):
-        df_valid = df[df['recorded_date'].notna()].copy()
-        df_valid['period'] = df_valid['recorded_date'].dt.to_period('M').astype(str)
-        summary = df_valid.groupby('period').size().reset_index(name='count')
-        fig3 = px.line(summary, x='period', y='count')
-        chart_html3 = fig3.to_html(full_html=False)
-    else:
-        chart_html3 = "<p style='text-align:center;'>유효한 날짜 데이터가 없습니다.</p>"
+     # ✅ 차트 3: heatmap -> 지역별, 손상유형별 빈도도
+    pivot = df.groupby(['location', 'damage_type']).size().unstack(fill_value=0)
+
+    fig3 = go.Figure(data=go.Heatmap(
+        z=pivot.values,
+        x=pivot.columns,
+        y=pivot.index,
+        colorscale='YlOrRd',
+        colorbar=dict(title='건수'),
+        hoverongaps=False
+    ))
+
+    fig3.update_layout(title='위치별 손상유형 히트맵', xaxis_title="손상 유형", yaxis_title="위치")
+    chart_html3 = fig3.to_html(full_html=False)
 
     return render_template('dashboard.html',
                            chart_html1=chart_html1,
@@ -1183,7 +1188,7 @@ def generate_chart():
         min_date = min_date_query.strftime('%Y-%m-%d') if min_date_query else ''
         max_date = max_date_query.strftime('%Y-%m-%d') if max_date_query else ''
 
-        return render_template(path,
+        return render_template('mapping.html',
                                chart_html=chart_html,
                                start_date=start_date,
                                end_date=end_date,
