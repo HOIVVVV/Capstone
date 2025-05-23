@@ -106,7 +106,6 @@ def predict_image(image_path, save_path, video_title, frame_number):
     if top3_probs_vals[0] >= 0.5:
         damage_detected = top3_labels[0] not in non_damage_labels
     else:
-        # top1이 50% 미만이면 top2까지만 확인
         damage_detected = any(label not in non_damage_labels for label in top3_labels[:2])
 
     print(f"\n📄 [{os.path.basename(image_path)}] 분석 결과:")
@@ -118,20 +117,6 @@ def predict_image(image_path, save_path, video_title, frame_number):
         os.remove(image_path)
         return []
 
-    grad_cam = GradCAM(model, target_layer=model.layer4[2].conv3)
-    cam = grad_cam.generate_cam(image_tensor)
-
-    if cam is None or np.max(cam) == 0:
-        return top3_labels
-
-    cam_resized = cv2.resize(cam, (original_width, original_height))
-    heatmap = cv2.applyColorMap(np.uint8(255 * cam_resized), cv2.COLORMAP_JET)
-    heatmap = np.float32(heatmap) / 255
-    original_np = np.array(original_image).astype(np.float32) / 255.0
-    overlay = heatmap + original_np
-    overlay = overlay / np.max(overlay)
-    overlay = np.uint8(255 * overlay)
-
     frame_tag = f"f{str(frame_number).zfill(3)}"
     if top3_probs_vals[0] >= 0.9:
         label_string = f"{top3_labels[0]}({int(top3_probs_vals[0]*100)})"
@@ -140,15 +125,12 @@ def predict_image(image_path, save_path, video_title, frame_number):
 
     base_filename = f"{frame_tag}_{label_string}"
     image_save_path = os.path.join(save_path, f"{base_filename}.jpg")
-    gradcam_save_path = os.path.join(save_path, f"{base_filename}_GradCAM.jpg")
 
     original_image.save(image_save_path)
-    cv2.imwrite(gradcam_save_path, cv2.cvtColor(overlay, cv2.COLOR_RGB2BGR))
-
     print(f"🖼️ 이미지 저장: {image_save_path}")
-    print(f"📸 Grad-CAM 저장: {gradcam_save_path}")
 
     return top3_labels
+
 
 if __name__ == "__main__":
     folder_path = input("📁 예측할 이미지 폴더 경로: ").strip()

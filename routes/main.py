@@ -90,7 +90,7 @@ def dashboard():
     # ✅ 차트 1: pieChart -> 손상유형통계
     summary = df['damage_type'].value_counts().reset_index()
     summary.columns = ['damage_type', 'count']
-    fig1 = px.pie(summary, values='count', names='damage_type', title='손상 유형 분포', hole=0.3)
+    fig1 = px.pie(summary, values='count', names='damage_type', hole=0.3)
     chart_html1 = fig1.to_html(full_html=False)
 
     # ✅ 차트 2: stacked -> 지역별 손상빈도
@@ -104,7 +104,6 @@ def dashboard():
         ))
     fig2.update_layout(
         barmode='stack',
-        title='Stacked Bar Chart',
         xaxis_title='위치',
         yaxis_title='건수'
     )
@@ -122,7 +121,7 @@ def dashboard():
         hoverongaps=False
     ))
 
-    fig3.update_layout(title='위치별 손상유형 히트맵', xaxis_title="손상 유형", yaxis_title="위치")
+    fig3.update_layout(xaxis_title="손상 유형", yaxis_title="위치")
     chart_html3 = fig3.to_html(full_html=False)
 
     return render_template('dashboard.html',
