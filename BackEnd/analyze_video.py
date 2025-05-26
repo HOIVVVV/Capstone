@@ -62,6 +62,15 @@ def analyze_video(video_path):
 
     district = ocr_result.get('district')
     recorded_date = ocr_result.get('date')
+    
+    # ✅ 🔽 여기 추가
+    for text_frame in text_frame_paths:
+        try:
+            if os.path.exists(text_frame):
+                os.remove(text_frame)
+                print(f"🧹 텍스트 프레임 삭제됨: {text_frame}")
+        except Exception as e:
+            print(f"⚠️ 텍스트 프레임 삭제 실패: {e}")
 
     # ✅ 본 분석 시작
     progress["step"] = "📽️ 프레임 추출 중..."
